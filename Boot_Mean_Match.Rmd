@@ -1,0 +1,271 @@
+---
+title: "Bootstrapped: Mean Matched Max Correlations Comparison"
+author: "Jacob DeRosa"
+output:
+  html_document:
+    number_sections: no
+    toc: yes
+    toc_float:
+      collapsed: no
+      smooth_scroll: yes
+      
+---
+
+```{r, echo = F, include = F}
+
+#load libraries 
+library(dplyr)
+library(ggplot2)
+
+#increase to max memory limit if using windows -- hash out for macs
+memory.limit(10000000000000) 
+
+analysis = "Bootstrapped"
+sample = "CBCL"
+
+analysis_name <- paste0(sample, '/', analysis)
+todays_date <- Sys.Date()
+
+dir.create(paste0('C:/Users/jacob.derosa/Desktop/Scripts/Baggin_Subtyping/CBCL/plots/'))
+dir.create(paste0('C:/Users/jacob.derosa/Desktop/Scripts/Baggin_Subtyping/CBCL/plots/',sample))
+dir.create(paste0('C:/Users/jacob.derosa/Desktop/Scripts/Baggin_Subtyping/CBCL/plots/',sample,'/',analysis))
+```
+
+```{r, echo = F, include = F}
+#set working directory
+setwd("C:/Users/jacob.derosa/Desktop/Scripts/Baggin_Subtyping/CBCL/home/jderosa/Documents/Baggin_Subtyping/Output/data/csv")
+```
+
+```{r}
+my_data = lapply(list.files(pattern = glob2rx("*CBCL_Cluster_1*.csv")), read.csv, header = T, sep = ",") 
+python_df = read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Baggin_Subtyping/CBCL/Splits/CBCL_Split_1.csv", header = T, sep = ",") %>% rename(Key = X)
+python_list = list(python_df) #put python df into list that will merged with sample split dfs 
+
+my_data2 = lapply(list.files(pattern = glob2rx("*CBCL_Cluster_2*.csv")), read.csv, header = T, sep = ",")
+python_df2 = read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Baggin_Subtyping/CBCL/Splits/CBCL_Split_2.csv", header = T, sep = ",") %>% rename(Key = X) 
+python_list2 = list(python_df2) 
+
+```
+
+```{r}
+
+#loop through split 1 and create a data frame that contins all subject x clusters assignments. This will be used to determine the proportion of 
+# of the number of clusters. Ex: 4 clusters appeared "n" amount of times out of 100 iterations.
+
+for (i in 1:length(my_data)){    
+  tmp = data.frame(my_data[[i]])          
+  tmp = tmp %>% select(cluster)
+  tmp$iter = i
+  if (i == 1){
+    bootcluster = tmp 
+  }
+  else{
+    bootcluster = rbind(bootcluster, tmp) 
+  }
+}
+
+#create a data frame that groups the unique clusters by iterations and counts the number of times that number of clusters was the result.
+bootclustercount = bootcluster %>%
+  group_by(iter) %>%         
+  summarise(Unique_Elements = n_distinct(cluster)) %>%
+  group_by(Unique_Elements) %>% mutate(count = n())
+bootclustercount$Split = "Split 1"
+
+#_____________________________________________________________________________________________________________________________________________________
+
+#join data CBCL data with cluster outputs in a list
+
+df_list = Map(left_join, my_data, python_list, by = c("Key"))
+
+
+#1) loop for list to create data frame with CBCL subscales, iterations and cluster assingments. 
+#2) create a seperate dataframe that contains mean CBCL subscale scores by cluster by louvain iteration. Will be used for max correlation matching
+
+for (i in 1:length(df_list)){
+  tmp2 = data.frame(df_list[[i]] %>% select(cluster, CBCL_AD_T, CBCL_RBB_T, CBCL_WD_T, CBCL_TP_T, CBCL_SC_T, CBCL_AP_T, CBCL_AB_T, CBCL_SP_T)) 
+# creates data frame with CBCL subscale score, cluster assingment, and louvain iteration
+  tmp2$iter = i
+  tmp2 = tmp2 %>%
+    rename("Anxious Depressed" = CBCL_AD_T) %>%
+    rename("Rule Breaking" = CBCL_RBB_T) %>%
+    rename("Withdrawn Depressed" = CBCL_WD_T) %>%
+    rename("Thought Problems" = CBCL_TP_T) %>%
+    rename( "Sommatic Complaints" = CBCL_SC_T) %>%
+    rename("Attention Problems" = CBCL_AP_T) %>%
+    rename("Agressive Behavior" = CBCL_AB_T) %>%
+    rename("Social Problems" = CBCL_SP_T)   # renames subscales columns names with the actual name of subscale 
+  if (i == 1){
+    bootcbcl = tmp2
+  }
+  else{
+    bootcbcl = rbind(bootcbcl, tmp2)
+  }
+  split_1 = bootcbcl %>%
+    group_by(iter, cluster) %>%
+    summarise(
+      AD = mean(`Anxious Depressed`),
+      RB = mean(`Rule Breaking`),
+      WD = mean(`Withdrawn Depressed`) ,
+      TP = mean(`Thought Problems`) ,
+      SC = mean(`Sommatic Complaints`) ,
+      AP = mean(`Attention Problems`) ,
+      AB = mean(`Agressive Behavior`) ,
+      SP = mean(`Social Problems`)
+    )
+}
+
+```
+
+```{r, echo = F}
+
+#Repeat steps from above for Split 1 on Split 2 
+
+for (i in 1:length(my_data2)){
+  tmp_2 = data.frame(my_data2[[i]])
+  tmp_2 = tmp_2 %>% select(cluster)
+  tmp_2$iter = i
+  if (i == 1){
+    bootcluster2 = tmp_2 
+  }
+  else{
+    bootcluster2 = rbind(bootcluster2, tmp_2)
+  }
+}
+
+#_____________________________________________________________________________________________________________________________________________________
+
+
+bootclustercount2 = bootcluster2 %>%
+  group_by(iter) %>%         
+  summarise(Unique_Elements = n_distinct(cluster)) %>%
+  group_by(Unique_Elements) %>% mutate(count = n())
+bootclustercount2$Split = "Split 2"
+
+#_____________________________________________________________________________________________________________________________________________________
+
+df_list2 = Map(left_join, my_data2, python_list2, by = c("Key"))
+
+for (i in 1:length(df_list2)){
+  tmp3 = data.frame(df_list2[[i]] %>% select(cluster, CBCL_AD_T, CBCL_RBB_T, CBCL_WD_T, CBCL_TP_T, CBCL_SC_T, CBCL_AP_T, CBCL_AB_T, CBCL_SP_T)) 
+  tmp3$iter = i
+  tmp3 = tmp3%>%
+    rename("Anxious Depressed" = CBCL_AD_T) %>%
+    rename("Rule Breaking" = CBCL_RBB_T) %>%
+    rename("Withdrawn Depressed" = CBCL_WD_T) %>%
+    rename("Thought Problems" = CBCL_TP_T) %>%
+    rename( "Sommatic Complaints" = CBCL_SC_T) %>%
+    rename("Attention Problems" = CBCL_AP_T) %>%
+    rename("Agressive Behavior" = CBCL_AB_T) %>%
+    rename("Social Problems" = CBCL_SP_T)
+  if (i == 1){
+    bootcbcl2 = tmp3
+  }
+  else{
+    bootcbcl2= rbind(bootcbcl2, tmp3)
+  }
+  split_2 = bootcbcl2 %>%
+    group_by(iter, cluster) %>%
+    summarise(
+      AD = mean(`Anxious Depressed`),
+      RB = mean(`Rule Breaking`),
+      WD = mean(`Withdrawn Depressed`) ,
+      TP = mean(`Thought Problems`) ,
+      SC = mean(`Sommatic Complaints`) ,
+      AP = mean(`Attention Problems`) ,
+      AB = mean(`Agressive Behavior`) ,
+      SP = mean(`Social Problems`)
+    )
+}
+
+
+```
+
+```{r}
+
+both_counts = rbind(bootclustercount, bootclustercount2)
+
+ggplot(aes(x=Unique_Elements, fill=count), data=both_counts) + geom_bar() +
+  labs(x = 'Cluster', y = 'Count', title = 'Split 2 Cluster Solutions') + facet_wrap(~Split)
+
+ggsave(filename=paste0('C:/Users/jacob.derosa/Desktop/Scripts/Baggin_Subtyping/CBCL/plots/', analysis_name, '/Bootstrapped_Cluster_Counts.png'))
+
+```
+
+```{r}
+
+#create 2 seperate lists for split 1 and split 2 that contain each split's cluster's mean cbcl subscale scores by iterations 
+# both lists will be later joined together in a list 
+
+full1 = list() #create empty list for split 1, filter by unique iteration
+for(i in 1:length(unique(split_1$iter))){
+  full1[[i]] <- split_1[split_1$iter == unique(split_1$iter)[i], ]
+  full1[[i]] <-  full1[[i]][,3:10]
+}
+
+full2 = list() #create empty list for split 2, filter by unique iteration
+for(i in 1:length(unique(split_2$iter))){
+    full2[[i]] <- split_2[split_2$iter == unique(split_2$iter)[i], ]
+    full2[[i]] <- full2[[i]][,3:10]
+}
+
+#comines split 1 list and split 2 list in a larger list. Correlation will be calculated between split 1 iteration "n" and split 2 interation "n". 
+full_list = list(full1, full2) #creates nested list with split 1 in one list and split 2 in another 
+full_list2 = do.call(Map, c(f = rbind, full_list)) #row binds both split lists together by matching iteration. Creates cluster x subscale matrix with mean cbcl subscale scores by cluster for split 1 and split 2 
+transposeList <- lapply(full_list2,function(x){t(x)}) #transpose matrices to create a subscale x cluster matrix that will used to calculate correlation matrix 
+cor = lapply(transposeList,function(x){cor(x, method = "pearson", use="pairwise.complete.obs")}) #function to apply pearson correlation on each subscale x cluster matrix 
+
+
+```
+
+```{r}
+
+# create empty lists to store matched clusters max correlation values 
+results = list() #empty list that goes through 2 steps: 1) initialized to have 3 columns (Var 1 = cluster from split 1, Var 2 = cluster from split 2, Cor = max correlation value between the matched clusters)
+maxval = list() #empty list that will be used to store the maximum correlation value at each step of the max correlation process 
+max = list() #empty list that will be used to store highest matched cluster max correlation values after each iteration and turn their scores to 0 back in the correlation matrix once matched to the loop will match the next clusters by max correlation. 
+
+# loop through each correlation matrix and look at the maximum correlation at each step. So the first step will not look only at the first row, but at the whole matrix
+for (i in 1:length(cor)){
+  rownames(cor[[i]]) <- colnames(cor[[i]]) <- LETTERS[1:nrow(cor[[i]])] #cluster rows are renamed to letter assingments that will be matched under Var 1 and Var2.
+  results[[i]] <- data.frame(v1=character(0), v2=character(0), cor=numeric(0), stringsAsFactors=FALSE)
+  diag(cor[[i]]) <- 0 #set diagonal to 0 prevent self correlation matching 
+  
+  #loops through each correlation maxtrix and match clusters  
+  while (sum(cor[[i]]>0)>1) {
+    maxval[[i]] <- max(cor[[i]]) 
+    max[[i]] <- which(cor[[i]]==maxval[[i]], arr.ind=TRUE)[1,]
+    results[[i]] <- rbind(results[[i]], data.frame(v1=rownames(cor[[i]])[max[[i]][1]], v2=colnames(cor[[i]])[max[[i]][2]], cor=maxval[[i]]))
+    cor[[i]][max[[i]][1],] <- 0
+    cor[[i]][,max[[i]][1]] <- 0
+    cor[[i]][max[[i]][2],] <- 0
+    cor[[i]][,max[[i]][2]] <- 0
+  }
+  matchedcors <- lapply(results,function(x){t(x[,3])}) #extracts only matched cluster's correlation value by for each results list that are in long form and transposes it to wide format  
+}
+
+```
+
+```{r}
+
+#create a data from the list of matched clusters max correlation values from the list and combines them by row into a data frame. Each row corresponds to a loubain iteration 
+matcheddf <- plyr::ldply (matchedcors, data.frame)
+names(matcheddf) <- sub("^X", "", names(matcheddf))
+
+#put matched clusters correlations into long format to remove NAs without removing entire row. The purpose of removing NAs is because there are some matched correlations
+#that did not have 5 or 6 clusters that matched. This is because a given sample split may have had 4 clusters while the other split had 5 - this results in only 4 clusters being matched. 
+#This results in some matched cluster max correlation rows being longer than other and if NAs are omitted without turning the data frame into long format the entire rows values will be lost. 
+matchedlong = tidyr::gather(matcheddf, key = 'X', value = 'Val') 
+matchedlong = na.omit(matchedlong) 
+
+#group matched correlations value by X which corresponds to the cluster, then calculate confidence intervals for max correlations by matched cluster. 
+#clusters are in descending order by max correlation value. For example, cluster 1 is the highest max correlation value from the most similar cluster from the other split. 
+matchedcount = matchedlong %>%
+  group_by(X) %>%  
+  summarise(meanX1= mean(Val),
+            X1Lwr95 = quantile(Val, probs = .025),
+            X1Upr95 = quantile(Val, probs = .975),
+            X1Lwr80 = quantile(Val, probs = .1),
+            X1Upr80 = quantile(Val, probs = .9))
+
+write.csv(matchedcount, "C:/Users/jacob.derosa/Desktop/Scripts/Baggin_Subtyping/boot_matched.csv")
+```
