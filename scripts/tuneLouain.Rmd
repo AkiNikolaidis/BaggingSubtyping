@@ -1,0 +1,109 @@
+---
+title: "tuneLouain"
+author: "Ian Douglas"
+date: "6/18/2020"
+output: html_document
+---
+```{r}
+library(igraph)
+library(phenoGraph)
+library(KernelKnn)
+library(parallel)
+library(doParallel)
+```
+
+# Define the helper function
+The function `hybrid_cluster` will wrap the the two-step louvain clustering procedure: 1.graph construction; 2. community detection. This will enable us to "tune" hyperparameters of the algorithm
+```{r}
+hybrid_clust = function(data, num.neighbors = "default", Hadamard = TRUE)
+{
+  # Hybrid_clust allows you to conduct the entire phenoGraph::phenoClust()
+  # algorithm (both steps) using a combination of igraph and 
+  # phenoGraph (hence the name "hybrid") functions. iGraph is implemented in 
+  # C++ (via Rcpp), so the slow louvain() function is supplanted by 
+  # igraph::cluster_louvain (10x times faster), but `hybrid_clust` also 
+  # makes use of phenoGraph::hadamard to conveniently filter the data prior 
+  # to running louvain algorithm. Also, the default number of neighbors is
+  # N / ceiling(log2(N) + 1), [equivalent to N / nclass.Sturges(N)], whereas
+  # the default in phenoGraph is simply nclass.Sturges(N), or ceiling(log2(N) + 1)
+  
+  if (num.neighbors == "default") {
+    num.neighbors <- ceiling(nrow(data)/ceiling(log2(nrow(data) + 1)))
+  } else num.neighbors <- as.numeric(num.neighbors)
+  
+  param_grid = expand.grid()
+  # (1) Obtain an adjacency matrix, defining an edge between each subject and their nearest neighbor
+  # Place this value in a weighted adjacency matrix
+  adj <- matrix(0, nrow = nrow(data), ncol = nrow(data))
+  knn <- knn.index.dist(data, k = num.neighbors) # defaults to euclidean distance
+  for (i in 1:nrow(data)) {
+    for (j in 1:num.neighbors) {
+      neighbor <- knn$train_knn_idx[i, j]
+      adj[i, neighbor] <- adj[neighbor, i] <- 1
+    }
+  }
+  
+  if (Hadamard) {
+    adj <- phenoGraph::hadamard(adj)
+  }
+  
+  G <- igraph::graph_from_adjacency_matrix(adjmatrix = adj,
+                                           mode = "undirected",
+                                           weighted = TRUE,
+                                           diag = F)
+  # (3) Conduct louvain community detection
+  cl <- igraph::cluster_louvain(G)
+  
+  return(
+    list(
+      "cluster_labels" = cl$membership,
+      "optimal.k" = n_distinct(cl$membership),
+      "modularity" = max(cl$modularity) # extract the modularity from the optimal iteration
+    )
+  )
+}
+```
+
+# Read in the HBN CBCL data
+```{r}
+Basic_Demos <- read.csv("../data/HBN/Basic_Demos_r8.csv", header =T, sep = ",")  %>%
+  select(URSI, Age, Sex) %>%
+  rename(Ages = Age)
+
+Diagnosis <- read.csv("../data/HBN/Diagnosis.csv", header = T, sep = ",") %>%
+  rename(ANX = `Anxiety.Disorders`) %>%
+  rename(ASD = `Autism.Spectrum.Disorder`) %>%
+  rename(ADHD = `Attention.Deficit.Hyperactivity.Disorder`) %>%
+  rename(DEP = `Depressive.Disorders`) %>%
+  rename(NT = `No.Diagnosis.Given`) %>%
+  rename(LD = Learning_Disorder) %>%
+  rename(ADHD_C = ADHD.Combined.Type) %>%
+  rename(ADHD_I = ADHD.Inattentive.Type) %>%
+  rename(ADHD_H = ADHD.Hyperactive.Impulsive.Type) %>%
+  rename(ODD = Oppositional.Defiant.Disorder) %>% 
+  select(-X, -starts_with("Specific"))
+
+CBCL <- read.csv("../data/HBN/CBCL_r8.csv", header =T, sep = ",") %>% select(URSI, ends_with("_T"))
+
+CBCL = CBCL %>% inner_join(Diagnosis, by = "URSI") %>% inner_join(Basic_Demos, by = "URSI") %>% mutate(Ages = floor(Ages))
+# Parse out X variables from the labels
+CBCL.X <- CBCL[!names(CBCL) %in% names(Basic_Demos)] # also drops URSI
+CBCL.labels <- CBCL %>% select(all_of(names(Basic_Demos)))
+```
+
+# Tune the louvain clustering for different values of k, and whether to binarize or not
+```{r}
+param_grid = rbind(expand.grid("nn" = seq(1, 150, length.out = 40),
+                               "had" = TRUE),
+                   expand.grid("nn" = "default",
+                               "had" = c(TRUE, FALSE)))
+
+cluster <- parallel::makeCluster(parallel::detectCores() - 1)
+doParallel::registerDoParallel(cluster) # register the parallel processing
+louv_tune = apply(param_grid, 1, function(x) {
+  hybrid_clust(CBCL.X, num.neighbors = x[1], Hadamard = x[2])
+})
+doParallel::stopImplicitCluster()
+beepr::beep()
+```
+
