@@ -1,0 +1,434 @@
+---
+title: "Function to produce and compare multiple cluster solutions"
+author: "Ian Douglas"
+date: "6/16/2020"
+output: html_document
+---
+```{r}
+library(mclust)
+library(phenoGraph)
+library(parallel)
+library(devtools)
+library(igraph)
+library(KernelKnn)
+library(cluster)
+suppressPackageStartupMessages(suppressMessages(library(tidyverse, quietly = T)))
+# devtools::source_url("https://github.com/ijd2109/visualizations/blob/master/R/parallelCoordPlot.R")
+```
+
+# Define functions to conduct each clustering
+```{r}
+# Plotting function for parallel coordinates
+parallelCoordPlot <- function(data, 
+                              unique.id.col, 
+                              group.col, 
+                              selection = everything(), 
+                              plot.it = TRUE, 
+                              plot_group_means = FALSE, 
+                              scale = FALSE,
+                              ...)
+{
+  require(ggplot2)
+  require(rlang)
+  require(dplyr)
+  require(tidyr)
+  dat <- dplyr::select(data, !!enquo(unique.id.col), !!enquo(group.col), all_of(selection)) %>%
+    mutate_at(-1:-2, ~as.numeric(as.character(.)))
+  if (scale) {
+    dat[-1:-2] <- dat[-1:-2] %>% mutate_all(~((. - mean(.)) / sd(.)))
+  }
+  # Gather the columns whose values will be plotted into long format
+  reshaped <- tidyr::gather(data = dat, key = key, value = value, 
+                            -!!enquo(unique.id.col), -!!enquo(group.col)) %>%
+    setNames(., c("id", "group", "dimension", "expression")) %>%
+    mutate_at(vars(id, group), factor) 
+  
+  # The `group` aesthetic is mapped to the unit whose values
+  # we want to connect along a single line (unique.id)
+  # A larger grouping variable may be used to color points/lines for
+  # units who belong to the same group (group.col)
+  plt <- ggplot(data = NULL,
+                aes(x = dimension, y = expression,
+                    group = id,
+                    color = group)) +
+    geom_point(data = reshaped, 
+               alpha = ifelse(plot_group_means,.3,.6), size = 1) +
+    geom_line(data = reshaped, 
+              alpha = .1, size = 1.5) +
+    theme_linedraw() +
+    theme(plot.background = element_rect(fill="beige"),
+          panel.background = element_rect(fill="white"),
+          panel.grid = element_line(color = "black"),
+          axis.text.x = element_text(angle = 80, hjust=.9, vjust = .9)) +
+    theme(...)
+  if (plot_group_means) {
+    plt<-plt + 
+      geom_point(data = reshaped[-1] %>%
+                   group_by(group, dimension) %>%
+                   summarize(expression = mean(expression)),
+                 aes(x = dimension, y = expression,
+                     group = group), 
+                 color = "red", alpha = 1, shape = 21, size = 3.5) +
+      geom_line(data = reshaped[-1] %>%
+                  group_by(group, dimension) %>%
+                  summarize(expression = mean(expression)),
+                aes(x = dimension, y = expression,
+                    group = group,
+                    color = group), 
+                alpha = 1, size = 2.4)
+  }
+  plt
+  #if (plot.it) {plt} else return(plt)
+}
+
+# A helper function to convert a cluster solution to an adjacency mat, and extract its modularity
+# Not necessary anymore, hierarchical clustering methods will be evaluated using silhouette width
+cluster_modularity = function(cluster.labels) 
+{
+  subject.idx <- as.character(seq_along(cluster.labels))
+  # (1) Convert the cluster label vector into an adjacency matrix
+  #### Obtaining a binary indicator vector (nrow by nclust) indicating membership in each cluster:
+  indicator.matrix <- as.matrix(purrr::map_dfc(
+    .x = unique(cluster.labels), 
+    .f = function(x) matrix(as.numeric(cluster.labels == x), ncol = 1)
+  ))
+  #(2) Create the adjacency matrix by simply filling in each row with the indicator vector like so:
+  #### If a subject is in cluster i, then their row of data is replaced with the i-th indicator vector
+  adjMat <- matrix(data = NA_integer_, #initialize empty matrix
+                   nrow = length(subject.idx), ncol = length(subject.idx),
+                   dimnames = list(subject.idx, subject.idx))
+  for (i in 1:nrow(adjMat)) {
+    adjMat[i, ] <- indicator.matrix[, which(unique(cluster.labels) == cluster.labels[i])]
+  }
+  diag(adjMat) <- 0
+  # (3) Convert the adjacency matrix to a graph and compute its modularity
+  G <- igraph::graph_from_adjacency_matrix(adjMat,
+                                           mode = "lower", # use the lower triangle of adjMat
+                                           weighted = NULL,
+                                           diag = F)
+  # (4) Now that it's represented as a graph, compute and return its modularity
+  modularity(x = G, membership = cluster.labels)
+}
+
+# Clustering Functions
+# Kmeans
+run_kmeans = function(data) 
+{
+  # scale the data for kmeans:
+  dat <- mutate_all(data, scale)
+  # obtain a breadth of kmeans solutions at different a range of k:
+  kmeans.list <- purrr::map(2:16, ~ kmeans(dat, centers = .)$cluster )
+  # Get the modularity of each solution
+  # m.vec = map_dbl(kmeans.list, ~ cluster_modularity(.))
+  # get the vector of silhouette widths for each solution:
+  s.vec = map_dbl(kmeans.list, ~ {mean(silhouette(x = ., dist = dist(dat))[, "sil_width"])})
+  # Return the best result
+  return(list(
+    "cluster_labels" = kmeans.list[[which.max(s.vec)]],
+    "optimal.k" = n_distinct(kmeans.list[[which.max(s.vec)]]),
+    "criteria" = c("sil_width" = s.vec[[which.max(s.vec)]]))
+  )
+}
+
+# Louvain
+run_louvain <- function(data)
+{
+  # THIS COMMENTED SECTION IMPLEMENTED STEP ONE MANUALLY. NOW SKIPPED.
+  # num.neighbors <- ceiling(nrow(data)/ceiling(log2(nrow(data) + 1)))
+  # # (1) Obtain an adjacency matrix, defining an edge between each subject and their nearest neighbor
+  # # Place this value in a weighted adjacency matrix
+  # adj <- matrix(0, nrow = nrow(data), ncol = nrow(data))
+  # knn <- knn.index.dist(data, k = num.neighbors) # defaults to euclidean distance
+  # for (i in 1:nrow(data)) {
+  #   for (j in 1:num.neighbors) {
+  #     neighbor <- knn$train_knn_idx[i, j]
+  #     adj[i, neighbor] <- adj[neighbor, i] <- 1
+  #   }
+  # }
+  # # (2) Create a graph representation of the adjacency matrix
+  # G <- igraph::graph_from_adjacency_matrix(adjmatrix = adj,
+  #                                          mode = "undirected",
+  #                                          weighted = NULL,
+  #                                          diag = F)
+  # # (3) Conduct louvain community detection
+  # cl <- igraph::cluster_louvain(G)
+  
+  # return(
+  #   list(
+  #     "cluster_labels" = cl$membership,
+  #     "optimal.k" = n_distinct(cl$membership),
+  #     "criteria" = c("modularity" = max(cl$modularity)) # extract the modularity from the optimal iteration
+  #   )
+  # )
+  l_clust <- phenoGraph::phenoClust(X = t(data))
+  return(
+    list(
+      "cluster_labels" = l_clust$C,
+      "optimal.k" = n_distinct(l_clust$C),
+      "criteria" = c("modularity" = l_clust$Q)
+    )
+  )
+}
+
+# Classic Hierarchical
+run_hclust = function(data)
+{
+  cl <- hclust(dist(data, method = "euclidean"), method = "ward.D2")
+  cl.list <- purrr::map(2:16, ~ cutree(cl, k = .))
+  # m.vec = map_dbl(cl.list, ~ cluster_modularity(.))
+  s.vec = map_dbl(cl.list, ~ {mean(silhouette(x = ., dist = dist(data))[, "sil_width"])})
+  return(list(
+    "cluster_labels" = cl.list[[which.max(s.vec)]],
+    "optimal.k" = n_distinct(cl.list[[which.max(s.vec)]]),
+    "criteria" = c("sil_width" = s.vec[[which.max(s.vec)]]))
+  )
+}
+
+# Partitioning Around Medoids (PAM)
+run_PAM = function(data)
+{
+  D <- dist(data, method = "euclidean")
+  pamCl.list <- purrr::map(2:16, ~ pam(x = D, diss = T, k = ., cluster.only = T))
+  # m.vec = map_dbl(pamCl.list, ~ cluster_modularity(.))
+  s.vec = map_dbl(pamCl.list, ~ {mean(silhouette(x = ., dist = D)[, "sil_width"])})
+  return(list(
+    "cluster_labels" = pamCl.list[[which.max(s.vec)]],
+    "optimal.k" = n_distinct(pamCl.list[[which.max(s.vec)]]),
+    "criteria" = c("sil_width" = s.vec[[which.max(s.vec)]]))
+  )
+}
+
+# Agglomerative Nesting
+run_agglom = function(data)
+{
+  D <- dist(data, method = "euclidean")
+  agg.list <- purrr::map(2:16, ~ cutree(agnes(x = D, diss = T), k = .))
+  # m.vec = map_dbl(agg.list, ~ cluster_modularity(.))
+  s.vec = map_dbl(agg.list, ~ {mean(silhouette(x = ., dist = D)[, "sil_width"])})
+  return(list(
+    "cluster_labels" = agg.list[[which.max(s.vec)]],
+    "optimal.k" = n_distinct(agg.list[[which.max(s.vec)]]),
+    "criteria" = c("sil_width" = s.vec[[which.max(s.vec)]]))
+  )
+}
+
+
+# Define a function to run these cluster solutions
+clusterverse = function(X = "a.dataframe.of.PREDICTORS")
+{
+  funcs = list(run_kmeans, run_hclust, run_agglom, run_louvain, run_PAM)
+  clusterings <- purrr::map(funcs, ~.(X))
+  names(clusterings) <- c("kmeans", "hclust", "agnes", "louvain", "pam")
+  clusterings
+}
+
+# A function to "tune" the louvain hyperparameters
+tune_louvain <- function(data, num.neighbors = "default")
+{
+  if (num.neighbors == "default") {
+    num.neighbors <- ceiling(nrow(data)/ceiling(log2(nrow(data) + 1)))
+  } else num.neighbors <- as.numeric(num.neighbors)
+  
+  param_grid = expand.grid()
+  # (1) Obtain an adjacency matrix, defining an edge between each subject and their nearest neighbor
+  # Place this value in a weighted adjacency matrix
+  adj <- matrix(0, nrow = nrow(data), ncol = nrow(data))
+  knn <- knn.index.dist(data, k = num.neighbors) # defaults to euclidean distance
+  for (i in 1:nrow(data)) {
+    for (j in 1:num.neighbors) {
+      neighbor <- knn$train_knn_idx[i, j]
+      adj[i, neighbor] <- adj[neighbor, i] <- 1
+    }
+  }
+  # (2) Create a graph representation of the adjacency matrix
+  G <- igraph::graph_from_adjacency_matrix(adjmatrix = adj,
+                                           mode = "undirected",
+                                           weighted = NULL,
+                                           diag = F)
+  # (3) Conduct louvain community detection
+  cl <- igraph::cluster_louvain(G)
+  
+  return(
+    list(
+      "cluster_labels" = cl$membership,
+      "optimal.k" = n_distinct(cl$membership),
+      "modularity" = max(cl$modularity) # extract the modularity from the optimal iteration
+    )
+  )
+}
+```
+
+# Reading in the HBN data (full sample)
+```{r}
+# Read in different surveys pertaining to the CBCL on the full sample
+Basic_Demos <- read.csv("../data/HBN/Basic_Demos_r8.csv", header =T, sep = ",")  %>%
+  select(URSI, Age, Sex) %>%
+  rename(Ages = Age)
+
+Diagnosis <- read.csv("../data/HBN/Diagnosis.csv", header = T, sep = ",") %>%
+  rename(ANX = `Anxiety.Disorders`) %>%
+  rename(ASD = `Autism.Spectrum.Disorder`) %>%
+  rename(ADHD = `Attention.Deficit.Hyperactivity.Disorder`) %>%
+  rename(DEP = `Depressive.Disorders`) %>%
+  rename(NT = `No.Diagnosis.Given`) %>%
+  rename(LD = Learning_Disorder) %>%
+  rename(ADHD_C = ADHD.Combined.Type) %>%
+  rename(ADHD_I = ADHD.Inattentive.Type) %>%
+  rename(ADHD_H = ADHD.Hyperactive.Impulsive.Type) %>%
+  rename(ODD = Oppositional.Defiant.Disorder) %>% 
+  select(-X, -starts_with("Specific"))
+
+CBCL <- read.csv("../data/HBN/CBCL_r8.csv", header =T, sep = ",") %>% select(URSI, ends_with("_T"))
+
+CBCL = CBCL %>% inner_join(Diagnosis, by = "URSI") %>% inner_join(Basic_Demos, by = "URSI") %>% mutate(Ages = floor(Ages))
+# Parse out X variables from the labels
+CBCL.X <- CBCL[!names(CBCL) %in% names(Basic_Demos)] # also drops URSI
+CBCL.labels <- CBCL %>% select(all_of(names(Basic_Demos)))
+```
+
+# WISC and WIAT combined data (full sample)
+```{r}
+split1 <- read.csv("../data/HBN/split1.csv") # see PAB for script to produce this cleaned data
+split2 <- read.csv("../data/HBN/split2.csv") # see PAB for script to produce this cleaned data
+
+fullWW.X = rbind(split1, split2) %>% select_if(is.numeric) # drop the subj ID
+fullWW.labels = rbind(split1, split2) %>% select(URSI)
+```
+
+# Run just louvain on the full samples
+```{r}
+pheno_CBCL.X = phenoClust(X = t(CBCL.X), repeats = 1)
+cbcl_results <- cbind(CBCL.labels, data.frame(louvain_community = pheno_CBCL.X$C), CBCL.X)
+write.csv(cbcl_results, "../output/fullSampleLouvainCBCLResults.csv", row.names = F)
+```
+
+# Run the clusterverse evaluation on both full datasets
+```{r}
+X.list <- list(
+  "CBCL" = CBCL.X,
+  "WW" = fullWW.X
+)
+```
+
+# run on these data frames ( just the splits are cleaned right now)
+```{r}
+t0 <- Sys.time()
+fullData.clusterverse <- mclapply(X.list, function(x) clusterverse(x), mc.cores = 3)
+elapsed <- Sys.time() - t0
+elapsed
+saveRDS(fullData.clusterverse, "../output/fullDataClusterCompareResults.rds")
+```
+
+# Compare results
+```{r}
+data.frame(
+  dataset = rep(names(fullData.clusterverse), each = length(fullData.clusterverse$CBCL)),
+  method = c(names(fullData.clusterverse$CBCL), names(fullData.clusterverse$WW)),
+  optimal.k = c(sapply(fullData.clusterverse$CBCL, function(x) x$optimal.k), sapply(fullData.clusterverse$WW, function(x) x$optimal.k)),
+  criteria = c(sapply(fullData.clusterverse$CBCL, function(x) names(x[[3]])), sapply(fullData.clusterverse$WW, function(x) names(x[[3]]))),
+  value = c(sapply(fullData.clusterverse$CBCL, function(x) x[[3]]), sapply(fullData.clusterverse$WW, function(x) x[[3]]))
+)
+```
+
+# parallel coords
+```{r}
+source("parallelCoordPlot.R")
+cbcl_plt_dat = CBCL.X %>%
+  mutate(URSI = CBCL.labels$URSI, louv_comm = fullData.clusterverse$CBCL$louvain$cluster_labels)
+ww_plt_dat = fullWW.X %>%
+  mutate(URSI = fullWW.labels$URSI, louv_comm = fullData.clusterverse$WW$louvain$cluster_labels)
+```
+```{r}
+parallelCoordPlot(data = cbcl_plt_dat, unique.id.col = "URSI", group.col = "louv_comm", scale = T, plot_group_means = T) +
+  ggtitle("CBCL Full Sample Communities")
+```
+```{r}
+parallelCoordPlot(data = ww_plt_dat, unique.id.col = "URSI", group.col = "louv_comm", scale = T, plot_group_means = T) +
+  ggtitle("WISC & WIAT Full Sample Communities")
+```
+
+# parallel coords
+```{r}
+
+split1$Community <- factor(split.clusterverse$split1$louvain$cluster_labels)
+split2$Community <- factor(split.clusterverse$split2$louvain$cluster_labels)
+parallelCoordPlot(data = split1 %>% mutate_if(is.numeric, scale), 
+                  unique.id.col = "URSI", group.col = "Community", plot_group_means = T)
+parallelCoordPlot(data = split2 %>% mutate_if(is.numeric, scale),
+                  unique.id.col = "URSI", group.col = "Community", plot_group_means = T)
+```
+
+
+```{r}
+split.clusterverse$split2
+```
+```{r}
+fullsamp <- rbind(split.list$split1,split.list$split2)
+full_sample.clusterverse <- clusterverse(fullsamp %>% delect_if(is.numeric))
+```
+# Results
+```{r}
+fullsamp.k = NULL
+fullsamp.crit = NULL
+for (nm in names(full_sample.clusterverse)) {
+  if (nm == "louvain") {
+    fullsamp.k[[nm]] <- full_sample.clusterverse[[nm]]$optimal.k
+    fullsamp.crit[[nm]] <- full_sample.clusterverse[[nm]]$modularity
+  } else {
+    fullsamp.k[[nm]] <- full_sample.clusterverse[[nm]]$Distance_Criteria$optimal.k
+    fullsamp.crit[[nm]] <- full_sample.clusterverse[[nm]]$Distance_Criteria$silhouette.width
+  }
+}
+data.frame(k = fullsamp.k, criteria = ifelse(names(fullsamp.k)=="louvain","modularity","sil_width"),
+           value = fullsamp.crit)
+```
+```{r}
+fullsamp$URSI <- c(split1$URSI, split2$URSI)
+fullsamp$Community <- factor(full_sample.clusterverse$louvain$cluster_labels)
+parallelCoordPlot(data = fullsamp %>% mutate_if(is.numeric, scale), 
+                  unique.id.col = "URSI", group.col = "Community", plot_group_means = T) + 
+  ggtitle("Full sample")
+```
+# Tune louvain for nearest neighbors
+```{r}
+
+
+# ceiling(nrow(fullsamp)/ceiling(log2(nrow(fullsamp)+1)))
+# [1] 150
+louvain.tune <- lapply(as.list(round(seq(1, 150, length.out = 100))), function(nn) {
+  tune_louvain(fullsamp %>% select_if(is.numeric), nn)
+})
+```
+```{r}
+res <- data.frame(
+  nbNeighbors = round(seq(1, 150, length.out = 100)),
+  best.k = sapply(louvain.tune, function(x) x$optimal.k),
+  modularity = sapply(louvain.tune, function(x) x$modularity)
+)
+p<-ggplot(res[-1, ]) +
+  geom_point(aes(x = nbNeighbors, y = best.k, color = modularity), size = 2) +
+  geom_line(aes(x = nbNeighbors, y = best.k, color = modularity), group = 1, size = 2) +
+  scale_color_viridis_c() +
+  geom_hline(aes(yintercept = sort(unique(res$best.k))[which.max(table(res$best.k))])) +
+  theme(legend.position = "left")
+ggExtra::ggMarginal(p, margins = "y", type = "histogram")
+  
+```
+```{r}
+
+```
+
+```{r}
+saveRDS(split.clusterverse, "output/split.clustervers_try1.rds")
+```
+
+# Comparing between solutions
+```{r}
+
+```
+
+# Parallel coordinates
+```{r}
+
+```
+
