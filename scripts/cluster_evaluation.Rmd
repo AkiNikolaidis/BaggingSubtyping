@@ -397,95 +397,25 @@ data.frame(
   value = c(sapply(fullData.clusterverse$CBCL, function(x) x[[3]]), sapply(fullData.clusterverse$WW, function(x) x[[3]]))
 )
 ```
-
-# parallel coords
+# adjusted Rand Index similarity across solutions
 ```{r}
-source("parallelCoordPlot.R")
-cbcl_plt_dat = CBCL.X %>%
-  mutate(URSI = CBCL.labels$URSI, louv_comm = fullData.clusterverse$CBCL$louvain$cluster_labels)
-ww_plt_dat = fullWW.X %>%
-  mutate(URSI = fullWW.labels$URSI, louv_comm = fullData.clusterverse$WW$louvain$cluster_labels)
+# library(mclust)
+data.frame("meth1" = rep(names(fullData.clusterverse$CBCL), each = 5), 
+           "meth2" = rep(names(fullData.clusterverse$CBCL), times = 5)) %>%
+  rbind(., .) %>%
+  mutate(predictor = c(rep("CBCL", times = 5*5), rep("WW", times = 5*5))) %>%
+  rowwise() %>%
+  mutate(adjRandIndex = adjustedRandIndex(fullData.clusterverse[[predictor]][[meth1]]$cluster_labels,
+                                       fullData.clusterverse[[predictor]][[meth2]]$cluster_labels)) %>%
+  ungroup() -> randFrame
 ```
+# plot the heatmap of adjusted rand indices between clustering methods
 ```{r}
-parallelCoordPlot(data = cbcl_plt_dat, unique.id.col = "URSI", group.col = "louv_comm", scale = T, plot_group_means = T) +
-  ggtitle("CBCL Full Sample Communities")
-```
-```{r}
-parallelCoordPlot(data = ww_plt_dat, unique.id.col = "URSI", group.col = "louv_comm", scale = T, plot_group_means = T) +
-  ggtitle("WISC & WIAT Full Sample Communities")
-```
-
-# parallel coords
-```{r}
-
-split1$Community <- factor(split.clusterverse$split1$louvain$cluster_labels)
-split2$Community <- factor(split.clusterverse$split2$louvain$cluster_labels)
-parallelCoordPlot(data = split1 %>% mutate_if(is.numeric, scale), 
-                  unique.id.col = "URSI", group.col = "Community", plot_group_means = T)
-parallelCoordPlot(data = split2 %>% mutate_if(is.numeric, scale),
-                  unique.id.col = "URSI", group.col = "Community", plot_group_means = T)
+ggplot(randFrame, aes(meth1, ordered(meth2, levels= rev(sort(unique(meth2)))), fill = adjRandIndex)) +
+  geom_tile() +
+  facet_grid(~predictor) +
+  scale_fill_viridis_c() +
+  theme(axis.title = element_blank()) +
+  geom_text(aes(label = round(adjRandIndex, 2)))
 ```
 
-
-```{r}
-split.clusterverse$split2
-```
-```{r}
-fullsamp <- rbind(split.list$split1,split.list$split2)
-full_sample.clusterverse <- clusterverse(fullsamp %>% delect_if(is.numeric))
-```
-# Results
-```{r}
-fullsamp.k = NULL
-fullsamp.crit = NULL
-for (nm in names(full_sample.clusterverse)) {
-  if (nm == "louvain") {
-    fullsamp.k[[nm]] <- full_sample.clusterverse[[nm]]$optimal.k
-    fullsamp.crit[[nm]] <- full_sample.clusterverse[[nm]]$modularity
-  } else {
-    fullsamp.k[[nm]] <- full_sample.clusterverse[[nm]]$Distance_Criteria$optimal.k
-    fullsamp.crit[[nm]] <- full_sample.clusterverse[[nm]]$Distance_Criteria$silhouette.width
-  }
-}
-data.frame(k = fullsamp.k, criteria = ifelse(names(fullsamp.k)=="louvain","modularity","sil_width"),
-           value = fullsamp.crit)
-```
-```{r}
-fullsamp$URSI <- c(split1$URSI, split2$URSI)
-fullsamp$Community <- factor(full_sample.clusterverse$louvain$cluster_labels)
-parallelCoordPlot(data = fullsamp %>% mutate_if(is.numeric, scale), 
-                  unique.id.col = "URSI", group.col = "Community", plot_group_means = T) + 
-  ggtitle("Full sample")
-```
-# Tune louvain for nearest neighbors
-```{r}
-
-
-# ceiling(nrow(fullsamp)/ceiling(log2(nrow(fullsamp)+1)))
-# [1] 150
-louvain.tune <- lapply(as.list(round(seq(1, 150, length.out = 100))), function(nn) {
-  tune_louvain(fullsamp %>% select_if(is.numeric), nn)
-})
-```
-```{r}
-res <- data.frame(
-  nbNeighbors = round(seq(1, 150, length.out = 100)),
-  best.k = sapply(louvain.tune, function(x) x$optimal.k),
-  modularity = sapply(louvain.tune, function(x) x$modularity)
-)
-p<-ggplot(res[-1, ]) +
-  geom_point(aes(x = nbNeighbors, y = best.k, color = modularity), size = 2) +
-  geom_line(aes(x = nbNeighbors, y = best.k, color = modularity), group = 1, size = 2) +
-  scale_color_viridis_c() +
-  geom_hline(aes(yintercept = sort(unique(res$best.k))[which.max(table(res$best.k))])) +
-  theme(legend.position = "left")
-ggExtra::ggMarginal(p, margins = "y", type = "histogram")
-  
-```
-```{r}
-
-```
-
-```{r}
-saveRDS(split.clusterverse, "output/split.clustervers_try1.rds")
-```
