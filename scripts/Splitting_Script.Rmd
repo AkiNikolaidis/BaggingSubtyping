@@ -1,0 +1,77 @@
+---
+title: "Data Splitting"
+author: "Jacob DeRosa"
+date: "5/5/2020"
+output: html_document
+---
+
+```{r, include=F, echo=F}
+
+# Load Required Packages
+packages <- c("dplyr", "caTools", "pander", "tidyverse", "ggridges")
+if (length(setdiff(packages, rownames(installed.packages()))) > 0) {
+  install.packages(setdiff(packages, rownames(installed.packages())))
+}
+lapply(packages, library, character.only = TRUE)
+
+```
+
+```{r}
+
+Basic_Demos <- read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Release8/Basic_Demos_r8.csv", header =T, sep = ",")  %>%
+  select(URSI, Age, Sex) %>%
+  rename(Ages = Age)
+
+
+Diagnosis <- read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Diagnosis.csv", header = T, sep = ",") %>%
+  rename(ANX = `Anxiety.Disorders`) %>%
+  rename(ASD = `Autism.Spectrum.Disorder`) %>%
+  rename(ADHD = `Attention.Deficit.Hyperactivity.Disorder`) %>%
+  rename(DEP = `Depressive.Disorders`) %>%
+  rename(NT = `No.Diagnosis.Given`) %>%
+  rename(LD = Learning_Disorder) %>%
+  rename(ADHD_C = ADHD.Combined.Type) %>%
+  rename(ADHD_I = ADHD.Inattentive.Type) %>%
+  rename(ADHD_H = ADHD.Hyperactive.Impulsive.Type) %>%
+  rename(ODD = Oppositional.Defiant.Disorder) %>% 
+  select(-X, -starts_with("Specific"))
+
+CBCL <- read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Release8/CBCL_r8.csv", header =T, sep = ",") %>% select(URSI, ends_with("_T"))
+
+CBCL = CBCL %>% inner_join(Diagnosis) %>% inner_join(Basic_Demos)
+#CBCL$Ages = floor(CBCL$Ages) 
+
+#write.csv(CBCL, "C:/Users/jacob.derosa/Desktop/Scripts/Full_CBCL_Splits/CBCL.csv")
+
+```
+
+```{r}
+
+Splitting = CBCL[,13:25] # Select variables to split on 
+
+set.seed(75845) 
+Splitting_Sample = sample.split(Splitting, SplitRatio = .5) #establish split ratio 
+CBCL_Split_1 = subset(CBCL, Splitting_Sample  == TRUE) #create Split 1
+CBCL_Split_2  = subset(CBCL, Splitting_Sample  == FALSE) #creat Split 2 
+
+# Place both splits into a list 
+List = list(CBCL_Split_1, CBCL_Split_2)
+
+# Run Chi square tests on split variables -- if any p value is significant, change seed and rerun 
+print(chisq.test(rbind(table(List[[1]]$Sex), table(List[[2]]$Sex)))) 
+print(chisq.test(rbind(table(List[[1]]$ANX), table(List[[2]]$ANX))))
+print(chisq.test(rbind(table(List[[1]]$ASD), table(List[[2]]$ASD))))
+print(chisq.test(rbind(table(List[[1]]$DEP), table(List[[2]]$DEP))))
+print(chisq.test(rbind(table(List[[1]]$NT), table(List[[2]]$NT))))
+print(chisq.test(rbind(table(List[[1]]$LD), table(List[[2]]$LD))))
+print(chisq.test(rbind(table(List[[1]]$ADHD_C), table(List[[2]]$ADHD_C))))
+print(chisq.test(rbind(table(List[[1]]$ADHD_I), table(List[[2]]$ADHD_I))))
+print(chisq.test(rbind(table(List[[1]]$ADHD_H), table(List[[2]]$ADHD_H))))
+print(chisq.test(rbind(table(List[[1]]$ODD), table(List[[2]]$ODD))))
+print(chisq.test(rbind(table(List[[1]]$Other), table(List[[2]]$Other))))
+print(t.test(List[[1]]$Ages, List[[2]]$Ages))
+
+#write.csv(CBCL_Split_1, "C:/Users/jacob.derosa/Desktop/Scripts/Full_CBCL_Splits/All_CBCL_Splits/CBCL_Split_1.csv")
+#write.csv(CBCL_Split_2, "C:/Users/jacob.derosa/Desktop/Scripts/Full_CBCL_Splits/All_CBCL_Splits/CBCL_Split_2.csv")
+
+```

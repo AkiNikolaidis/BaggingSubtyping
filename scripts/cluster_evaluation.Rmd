@@ -132,41 +132,40 @@ run_kmeans = function(data)
 }
 
 # Louvain
-run_louvain <- function(data)
+run_louvain <- function(data, num.neighbors = "default")
 {
-  # THIS COMMENTED SECTION IMPLEMENTED STEP ONE MANUALLY. NOW SKIPPED.
-  # num.neighbors <- ceiling(nrow(data)/ceiling(log2(nrow(data) + 1)))
-  # # (1) Obtain an adjacency matrix, defining an edge between each subject and their nearest neighbor
-  # # Place this value in a weighted adjacency matrix
-  # adj <- matrix(0, nrow = nrow(data), ncol = nrow(data))
-  # knn <- knn.index.dist(data, k = num.neighbors) # defaults to euclidean distance
-  # for (i in 1:nrow(data)) {
-  #   for (j in 1:num.neighbors) {
-  #     neighbor <- knn$train_knn_idx[i, j]
-  #     adj[i, neighbor] <- adj[neighbor, i] <- 1
-  #   }
-  # }
-  # # (2) Create a graph representation of the adjacency matrix
-  # G <- igraph::graph_from_adjacency_matrix(adjmatrix = adj,
-  #                                          mode = "undirected",
-  #                                          weighted = NULL,
-  #                                          diag = F)
-  # # (3) Conduct louvain community detection
-  # cl <- igraph::cluster_louvain(G)
+  if (num.neighbors == "default") {
+    num.neighbors <- ceiling(nrow(data)/ceiling(log2(nrow(data) + 1)))
+  } else num.neighbors <- as.numeric(num.neighbors)
   
-  # return(
-  #   list(
-  #     "cluster_labels" = cl$membership,
-  #     "optimal.k" = n_distinct(cl$membership),
-  #     "criteria" = c("modularity" = max(cl$modularity)) # extract the modularity from the optimal iteration
-  #   )
-  # )
-  l_clust <- phenoGraph::phenoClust(X = t(data))
+  param_grid = expand.grid()
+  # (1) Obtain an adjacency matrix, defining an edge between each subject and their nearest neighbor
+  # Place this value in a weighted adjacency matrix
+  adj <- matrix(0, nrow = nrow(data), ncol = nrow(data))
+  knn <- knn.index.dist(data, k = num.neighbors, method = distance) # defaults to euclidean distance
+  for (i in 1:nrow(data)) {
+    for (j in 1:num.neighbors) {
+      neighbor <- knn$train_knn_idx[i, j]
+      adj[i, neighbor] <- adj[neighbor, i] <- 1
+    }
+  }
+  
+  if (Hadamard) {
+    adj <- phenoGraph::hadamard(adj)
+  }
+  
+  G <- igraph::graph_from_adjacency_matrix(adjmatrix = adj,
+                                           mode = "undirected",
+                                           weighted = TRUE,
+                                           diag = F)
+  # (3) Conduct louvain community detection
+  cl <- igraph::cluster_louvain(G)
+  
   return(
     list(
-      "cluster_labels" = l_clust$C,
-      "optimal.k" = n_distinct(l_clust$C),
-      "criteria" = c("modularity" = l_clust$Q)
+      "cluster_labels" = cl$membership,
+      "optimal.k" = n_distinct(cl$membership),
+      "modularity" = max(cl$modularity) # extract the modularity from the optimal iteration
     )
   )
 }
@@ -257,8 +256,6 @@ tune_louvain <- function(data, num.neighbors = "default")
     )
   )
 }
-
-
 ```
 
 # Reading in the HBN data (full sample)
@@ -302,16 +299,16 @@ fullWW.labels = rbind(split1, split2) %>% select(URSI)
 ```{r}
 cluster <- makeCluster(detectCores() - 1) # number of cores, convention to leave 1 core for OS
 registerDoParallel(cluster) # register the parallel processing
-pheno_CBCL.X = phenoClust(X = t(CBCL.X))
-cbcl_results <- cbind(CBCL.labels, data.frame(louvain_community = pheno_CBCL.X$C), CBCL.X)
+pheno_CBCL.X = run_louvain(CBCL.X)
+cbcl_results <- cbind(CBCL.labels, data.frame(louvain_community = pheno_CBCL.X$cluster_labels), CBCL.X)
 write.csv(cbcl_results, "../output/fullSampleLouvainCBCLResults.csv", row.names = F)
 write.csv(cbcl_results %>% select(URSI, louvain_community),
           "../output/fullSamp_CBCL_LouClusterID+SubjID.csv",
           row.names = F)
 system("cp ~/DANL/OH*/output/fullSamp_CBCL_LouCluster*csv ~/DANL/OH*/Bag*/output/")
 system("git add ~/DANL/OH*/Bag*/output/*CBCL*; git commit -m 'new cbcl fullsamp results'; git pull; git push")
-pheno_WW.X = phenoClust(X = t(fullWW.X))
-ww_results <- cbind(fullWW.labels, data.frame(louvain_community = pheno_WW.X$C), fullWW.X)
+pheno_WW.X = run_louvain(fullWW.X)
+ww_results <- cbind(fullWW.labels, data.frame(louvain_community = pheno_WW.X$cluster_labels), fullWW.X)
 write.csv(ww_results, "../output/fullSampleLouvainWWResults.csv", row.names = F)
 write.csv(ww_results %>% select(URSI, louvain_community),
           "../output/fullSamp_WISC-WIAT_LouClusterID+SubjID.csv",
@@ -319,36 +316,39 @@ write.csv(ww_results %>% select(URSI, louvain_community),
 system("cp ~/DANL/OH*/output/fullSamp_WISC-WIAT_LouCluster*csv ~/DANL/OH*/Bag*/output/")
 system("git add ~/DANL/OH*/Bag*/output/*WISC-WIAT*; git commit -m 'new cbcl fullsamp results'; git pull; git push")
 stopImplicitCluster()
-registerDoSEQ()
+#registerDoSEQ()
 ```
 # Match up the cluster labels
 ```{r}
 # everyone in fullWW is in in CBCL, but not the reverse:
 joined.labels = CBCL.labels %>% 
-  mutate(cbclCommunity = pheno_CBCL.X$C) %>%
+  mutate(cbclCommunity = pheno_CBCL.X$cluster_labels) %>%
   filter(URSI %in% fullWW.labels$URSI) %>%
-  merge(., data.frame(URSI = fullWW.labels$URSI, wwCommunity = pheno_WW.X$C), nby = "URSI")
+  merge(., data.frame(URSI = fullWW.labels$URSI, wwCommunity = pheno_WW.X$cluster_labels), nby = "URSI")
 
 match.in.cbclC.for.wwC = NULL
 match2.in.cbclC.for.wwC = NULL
-for (i in 1:n_distinct(pheno_WW.X$C)) {
+for (i in 1:n_distinct(pheno_WW.X$cluster_labels)) {
   cbcl.c.overlap <- NULL
-  for (j in 1:n_distinct(pheno_CBCL.X$C)) {
-    cbcl.c.overlap[j] <- sum(fullWW.labels$URSI[pheno_WW.X$C == i] %in% CBCL.labels$URSI[pheno_CBCL.X$C == j])
+  for (j in 1:n_distinct(pheno_CBCL.X$cluster_labels)) {
+    cbcl.c.overlap[j] <- sum(fullWW.labels$URSI[pheno_WW.X$cluster_labels == i] %in% 
+                               CBCL.labels$URSI[pheno_CBCL.X$cluster_labels == j])
   }
   match.in.cbclC.for.wwC[i] <- which.max(cbcl.c.overlap)
   cbcl.c.overlap[which.max(cbcl.c.overlap)] <- 0
   match2.in.cbclC.for.wwC[i] = which.max(cbcl.c.overlap)
 }
-data.frame(WW_cluster = 1:n_distinct(pheno_WW.X), best = match.in.cbclC.for.wwC, second_best = match2.in.cbclC.for.wwC)
+data.frame(WW_cluster = 1:n_distinct(pheno_WW.X$cluster_labels), 
+           best = match.in.cbclC.for.wwC, 
+           second_best = match2.in.cbclC.for.wwC)
 ```
 
 We'll match up the colors of clusters 1, 2, and 3 in the WW data with 2, 4, and 5 respectively in the CBCL data
 ```{r}
 cbcl_plt_dat = cbind(CBCL.labels, CBCL.X) %>%
-  mutate(pheno_cluster = pheno_CBCL.X$C)
+  mutate(pheno_cluster = pheno_CBCL.X$cluster_labels)
 ww_plt_dat = cbind(fullWW.labels, fullWW.X) %>%
-  mutate(pheno_cluster = pheno_WW.X$C)
+  mutate(pheno_cluster = pheno_WW.X$cluster_labels)
 ```
 
 # Plot
@@ -359,13 +359,13 @@ parallelCoordPlot(data = cbcl_plt_dat %>% select(-Sex, -Ages),
                   group.col = "pheno_cluster",
                   plot_group_means = T,
                   scale = T) +
-  scale_color_manual(values = brewer.pal(7, "Paired")[c(1, 2, 4, 6,7)])
+  scale_color_manual(values = brewer.pal(7, "Paired")[c(1, 2, 4, 7, 3)])
 parallelCoordPlot(data = ww_plt_dat,
                   unique.id.col = "URSI",
                   group.col = "pheno_cluster",
                   plot_group_means = T,
                   scale = T) +
-  scale_color_manual(values = brewer.pal(7, "Paired")[c(2, 6, 7)])
+  scale_color_manual(values = brewer.pal(7, "Paired")[c(1, 2, 4, 6, 7, 3)])
 ```
 
 

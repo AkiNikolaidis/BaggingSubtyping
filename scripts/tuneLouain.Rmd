@@ -10,12 +10,13 @@ library(phenoGraph)
 library(KernelKnn)
 library(parallel)
 library(doParallel)
+library(tidyverse)
 ```
 
 # Define the helper function
 The function `hybrid_cluster` will wrap the the two-step louvain clustering procedure: 1.graph construction; 2. community detection. This will enable us to "tune" hyperparameters of the algorithm
 ```{r}
-hybrid_clust = function(data, num.neighbors = "default", Hadamard = TRUE)
+hybrid_clust = function(data, num.neighbors = "default", Hadamard = TRUE, distance = "euclidean")
 {
   # Hybrid_clust allows you to conduct the entire phenoGraph::phenoClust()
   # algorithm (both steps) using a combination of igraph and 
@@ -35,7 +36,7 @@ hybrid_clust = function(data, num.neighbors = "default", Hadamard = TRUE)
   # (1) Obtain an adjacency matrix, defining an edge between each subject and their nearest neighbor
   # Place this value in a weighted adjacency matrix
   adj <- matrix(0, nrow = nrow(data), ncol = nrow(data))
-  knn <- knn.index.dist(data, k = num.neighbors) # defaults to euclidean distance
+  knn <- knn.index.dist(data, k = num.neighbors, method = distance) # defaults to euclidean distance
   for (i in 1:nrow(data)) {
     for (j in 1:num.neighbors) {
       neighbor <- knn$train_knn_idx[i, j]
@@ -94,9 +95,12 @@ CBCL.labels <- CBCL %>% select(all_of(names(Basic_Demos)))
 # Tune the louvain clustering for different values of k, and whether to binarize or not
 ```{r}
 param_grid = rbind(expand.grid("nn" = seq(1, 150, length.out = 40),
-                               "had" = TRUE),
+                               "had" = TRUE,
+                               "dist" = ""),
                    expand.grid("nn" = "default",
-                               "had" = c(TRUE, FALSE)))
+                               "had" = c(TRUE, FALSE)),
+                   expand.grid("nn" = nclass.Sturges(1:nrow(CBCL.X)),
+                               "had" = c(FALSE)))
 
 cluster <- parallel::makeCluster(parallel::detectCores() - 1)
 doParallel::registerDoParallel(cluster) # register the parallel processing
@@ -105,5 +109,27 @@ louv_tune = apply(param_grid, 1, function(x) {
 })
 doParallel::stopImplicitCluster()
 beepr::beep()
+```
+
+# Compile results
+```{r}
+library(ggExtra)
+resFrame = data.frame(
+  stringsAsFactors = F,
+  best.k = sapply(louv_tune, function(x) x$optimal.k),
+  modularity = sapply(louv_tune, function(x) x$modularity),
+  nbNeighbors = as.numeric(replace(param_grid[,1], param_grid[, 1] == "default", "13")),
+  HadamardMethod = param_grid[,2]
+) %>%
+  mutate_at("nbNeighbors", ~as.numeric(replace(., . == "default", nclass.Sturges(1:nrow(CBCL.X))))) %>%
+  arrange(nbNeighbors)
+p<-ggplot(resFrame[-1,]) +
+  geom_point(aes(x = nbNeighbors, y = best.k, color = modularity), size = 2) +
+  geom_line(aes(x = nbNeighbors, y = best.k, color = modularity), group = 1, size = 2) +
+  scale_color_viridis_c() +
+  geom_hline(aes(yintercept = sort(unique(resFrame$best.k))[which.max(table(resFrame$best.k))])) +
+  theme(legend.position = "left") +
+  ggtitle(paste0("Most often cluster size: ", sort(unique(resFrame$best.k))[which.max(table(resFrame$best.k))]))
+ggExtra::ggMarginal(p, margins = "y", type = "histogram")
 ```
 
