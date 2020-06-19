@@ -1,0 +1,80 @@
+---
+title: "processResults"
+author: "Ian Douglas"
+date: "6/19/2020"
+output: html_document
+---
+```{r}
+library(tidyverse)
+library(igraph)
+```
+
+Desired output: a list object with 
+1) a dataframe of the subtype assignments for each person in each split, as well as each person's score on the z-scored input variables 
+2) a dataframe with the cluster means for each split 
+#) stability matrix
+
+
+```{r}
+bootdir = "../output/bootstraps_louvain/cog_split1" # contains all boot clusterings generated from split1
+full_split_path = "../data/" # contains split1.csv, the original data that produced the above
+# NOTE: right now, this function would have to be run twice, once for split1 and once for split2
+```
+
+```{r}
+bag_split = function(bootstrap_dir, full_split_path){
+  require(igraph)
+  require(tidyverse)
+  # This function will take a folder containing the bootstrapped clusterings for a single split and
+  # merge the cluster assignments back into the original data. Also, then generate mean scores for 
+  # the (standardized) cognitive variables, within each boot iteration.
+  # Then, it outputs the stability matrix as well.
+  boot.data = lapply(list.files(path = bootstrap_dir, full.names = TRUE), read.csv,
+                     header = T, sep = ",", stringsAsFactors = FALSE)
+  # Part 1- Generate stability matrix:
+  # (1) Generate an adjacency matrix with each bootstrap iteration's cluster labels
+  # (2) Convert this directly to an edge list
+  # (3) Concatenate all edge lists into a master edgelist
+  # (4) Convert this back to an adjacency matrix of "tallies", where each cell tallies up pairwise edges
+  # (5) Divide this matrix of pairwise tallies by the number of clusterings conducted.
+  
+  globalEdgeList <- reduce(purrr::map(boot.data, ~{
+    dedup <- . %>% filter(!duplicated(.)) # drop the duplicates
+    adj <- +(outer(dedup$cluster, dedup$cluster, FUN='=='))*!diag(nrow(dedup)) # get the adjacency matrix
+    rownames(adj) <- colnames(adj) <- dedup$URSI # re-attach the subject IDs
+    # generate the edge list (by converting it to a graph, then extracting the edge list)
+    el <- as_edgelist(graph_from_adjacency_matrix(adj, mode = "lower", # just the lower triangle
+                                                 diag = F, # ignore diagonal elements
+                                                 weighted = NULL)) # unweighted
+    return(el) # return this edge list for each boot.data
+    }), rbind) # rbind all these edge lists; and write to `globalEdgeList`
+  
+  # Compute the stability matrix
+  Stability <- as_adjacency_matrix(graph_from_edgelist(globalEdgeList, directed = F), type = "both") / length(boot.data)
+
+  
+  # Part 2- Long format data frame with each split's cluster assignments, and the raw data
+  # Read in the full split (the entire half of the data at this split)
+  full_data_split = read.csv(full_split_path, header = T, sep = ",", stringsAsFactors = FALSE) %>%
+    mutate_if(is.numeric, scale, center = T) # z-score it
+  # QUESTION: SHOULD WE SCALE IT AFTER MERGING TO THE BOOT SAMPLE?
+  # merge this data with each bootstrap data frame (of cluster labels and subj IDs); dropping subjects not in bootstrap sample
+  longData <- purrr::imap_dfr(boot.data, ~{
+    . %>%
+      filter(!duplicated(URSI)) %>%
+      select(URSI, cluster) %>%
+      merge(., full_split_data, by = "URSI", all.x = T, all.y = F) %>%
+      mutate(boot_resample = .y) # for imap_dfr, .y becomes the number in the list of boot.data
+  })
+  
+  
+  # Part 3- summarize within boot resample and cluster
+  summaryFrame = longData %>%
+    group_by(cluster, boot_resample) %>%
+    summarize_if(is.numeric, mean, na.rm = T)
+  
+  return(list('full_split' = full_data_split, 'stability' = Stability, 'longDataResults' = longData, 'ResultsSummary'= summaryFrame))
+}
+```
+
+
