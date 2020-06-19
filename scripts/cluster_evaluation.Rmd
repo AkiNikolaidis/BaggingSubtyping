@@ -416,6 +416,8 @@ ggplot(randFrame, aes(meth1, ordered(meth2, levels= rev(sort(unique(meth2)))), f
   facet_grid(~predictor) +
   scale_fill_viridis_c() +
   theme(axis.title = element_blank()) +
-  geom_text(aes(label = round(adjRandIndex, 2)))
+  geom_text(aes(label = round(adjRandIndex, 2))) +
+  coord_equal() +
+  ggtitle("Adjusted Rand Indices Between Clustering Solution of Different Methods")
 ```
 
