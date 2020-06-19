@@ -6,6 +6,10 @@ author: "Michelle VanTieghem"
 output: html_document
 ---
 
+# To do:
+Add all the demographic factors that we should be incorporating / controlling for.
+better way of visualizing relationships 
+question whether in tidymodels, we can run multiple models with different outcomes in the same set.
 
 ```{r, include = F, echo = F}
 library(tidyverse)
@@ -41,14 +45,41 @@ CBCL_dx_df <- left_join(CBCL_clust, dx_df, by = "URSI") %>%
   drop_na()  %>%
   # outcome for classification must be a factor
   mutate(Autism.Spectrum.Disorder = as.factor(Autism.Spectrum.Disorder), 
-         louvain_community = as.factor(louvain_community))
+         louvain_community = as.factor(louvain_community)) %>%
+  select (-X)
 
 nrow(CBCL_dx_df)
 
 # check frequency of autism dx
 CBCL_dx_df %>%
   count(Autism.Spectrum.Disorder)
+
+names(CBCL_dx_df)
 ```
+
+## plot clusters vs. diagnosis 
+```{r}
+
+ggplot(data = CBCL_dx_df, aes(y = Autism.Spectrum.Disorder, x = louvain_community)) + 
+  geom_jitter(alpha = 0.5)  + theme_bw() + geom_smooth()
+
+
+ggplot(data = CBCL_dx_df, aes(y = Anxiety.Disorders, x = louvain_community)) + 
+  geom_jitter(alpha = 0.5)  + theme_bw() + geom_smooth()
+
+
+```
+
+
+## basic logistic reg
+relative to cluster 1, all others predict higher likelihood
+```{r}
+lm_mod <- glm(Autism.Spectrum.Disorder ~ louvain_community, 
+              family = binomial(), data = CBCL_dx_df)
+summary(lm_mod)
+```
+
+# prep for more  complicated models... 
 
 ## make cross-validation folds
 ```{r}
@@ -65,8 +96,8 @@ cv_folds$splits[[1]]
 
 ## Set basic recipe: preprocessing
 ```{r}
-# set basic recipe 
-basic_recipe <- recipe(Autism.Spectrum.Disorder ~ louvain_community, 
+# set basic recipe ...
+basic_recipe <- recipe(Autism.Spectrum.Disorder ~ ., 
                        data = CBCL_dx_df) %>%
   
 
@@ -137,31 +168,6 @@ tree_predictions  %>%
 
 ```
 
-## Run random forest 
-```{r}
-# take the workflow, and use random forest model, with cv folds.
-rf_fit <- wf %>%
-  update_model(rf_spec) %>%
-  fit_resamples(
-          resamples = cv_folds,
-          metrics = metric_set(accuracy, roc_auc), 
-          control = control_resamples(save_pred = T))  # save predictions
-# get metrics 
-rf_metrics <- rf_fit %>%
-  collect_metrics()
-
-# get predictions
-rf_predictions <- rf_fit %>%
-  collect_predictions()
-
-rf_predictions %>%
-  count(.pred_class, Autism.Spectrum.Disorder)
-
-# make a confusion matrix 
-rf_predictions  %>%
-  conf_mat(truth = Autism.Spectrum.Disorder, estimate = .pred_class) 
-
-```
 
 
 
