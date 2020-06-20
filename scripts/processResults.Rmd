@@ -12,7 +12,7 @@ library(igraph)
 Desired output: a list object with 
 1) a dataframe of the subtype assignments for each person in each split, as well as each person's score on the z-scored input variables 
 2) a dataframe with the cluster means for each split 
-#) stability matrix
+3) stability matrix
 
 
 ```{r}
@@ -76,5 +76,4 @@ bag_split = function(bootstrap_dir, full_split_path){
   return(list('full_split' = full_data_split, 'stability' = Stability, 'longDataResults' = longData, 'ResultsSummary'= summaryFrame))
 }
 ```
-
 
