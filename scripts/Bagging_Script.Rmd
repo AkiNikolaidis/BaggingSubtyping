@@ -63,21 +63,23 @@ for(i in 1:length(df_list)){
 }
 
 adj_full_1 = acast(rbind(melt(adj[1:100])), Var1~Var2, sum)
-adj_full_2 = acast(rbind(melt(adj[101:200])), Var1~Var2, sum)
-adj_full_3 = acast(rbind(melt(adj[201:300])), Var1~Var2, sum)
-adj_full_4 = acast(rbind(melt(adj[301:400])), Var1~Var2, sum)
-adj_full_5 = acast(rbind(melt(adj[401:500])), Var1~Var2, sum)
-adj_full_6 = acast(rbind(melt(adj[501:600])), Var1~Var2, sum)
-adj_full_7 = acast(rbind(melt(adj[601:700])), Var1~Var2, sum)
-adj_full_8 = acast(rbind(melt(adj[701:800])), Var1~Var2, sum)
-adj_full_9 = acast(rbind(melt(adj[801:900])), Var1~Var2, sum)
-adj_full_10 = acast(rbind(melt(adj[901:1000])), Var1~Var2, sum)
+#adj_full_2 = acast(rbind(melt(adj_2[101:200])), Var1~Var2, sum)
+#adj_full_3 = acast(rbind(melt(adj_2[201:300])), Var1~Var2, sum)
+#adj_full_4 = acast(rbind(melt(adj_2[301:400])), Var1~Var2, sum)
+#adj_full_5 = acast(rbind(melt(adj_2[401:500])), Var1~Var2, sum)
+#adj_full_6 = acast(rbind(melt(adj_2[501:600])), Var1~Var2, sum)
+#adj_full_7 = acast(rbind(melt(adj_2[601:700])), Var1~Var2, sum)
+#adj_full_8 = acast(rbind(melt(adj_2[701:800])), Var1~Var2, sum)
+#adj_full_9 = acast(rbind(melt(adj_2[801:900])), Var1~Var2, sum)
+#adj_full_10 = acast(rbind(melt(adj_2[901:1000])), Var1~Var2, sum)
 
-adj_full_split_1 = acast(rbind(melt(adj_full_1), melt(adj_full_2), melt(adj_full_3), melt(adj_full_4), melt(adj_full_5), melt(adj_full_6), melt(adj_full_7), melt(adj_full_8), melt(adj_full_9), melt(adj_full_10)), Var1~Var2, sum)
+stab_full_split_1 = adj_full_1/100
 
-rm(adj_full_10, adj_full_9, adj_full_8, adj_full_7, adj_full_6, adj_full_5, adj_full_4, adj_full_3, adj_full_1, adj) #save memory and remove no longer needed matrices
+#adj_full_split_1 = acast(rbind(melt(adj_full_1), melt(adj_full_2), melt(adj_full_3), melt(adj_full_4), melt(adj_full_5), melt(adj_full_6), melt(adj_full_7), melt(adj_full_8), melt(adj_full_9), melt(adj_full_10)), Var1~Var2, sum)
 
-stab_full_split_1 = adj_full_split_1/1000 #divide the summed matrix by the number of total matrices to obtain final stability matrix
+#rm(adj_full_10, adj_full_9, adj_full_8, adj_full_7, adj_full_6, adj_full_5, adj_full_4, adj_full_3, adj_full_1, adj) #save memory and remove no longer needed matrices
+
+#stab_full_split_1 = adj_full_split_1/1000 #divide the summed matrix by the number of total matrices to obtain final stability matrix
 
 ```
 
@@ -106,21 +108,23 @@ for(i in 1:length(df_list2)){
 }
 
 adj_full_1 = acast(rbind(melt(adj_2[1:100])), Var1~Var2, sum)
-adj_full_2 = acast(rbind(melt(adj_2[101:200])), Var1~Var2, sum)
-adj_full_3 = acast(rbind(melt(adj_2[201:300])), Var1~Var2, sum)
-adj_full_4 = acast(rbind(melt(adj_2[301:400])), Var1~Var2, sum)
-adj_full_5 = acast(rbind(melt(adj_2[401:500])), Var1~Var2, sum)
-adj_full_6 = acast(rbind(melt(adj_2[501:600])), Var1~Var2, sum)
-adj_full_7 = acast(rbind(melt(adj_2[601:700])), Var1~Var2, sum)
-adj_full_8 = acast(rbind(melt(adj_2[701:800])), Var1~Var2, sum)
-adj_full_9 = acast(rbind(melt(adj_2[801:900])), Var1~Var2, sum)
-adj_full_10 = acast(rbind(melt(adj_2[901:1000])), Var1~Var2, sum)
+#adj_full_2 = acast(rbind(melt(adj_2[101:200])), Var1~Var2, sum)
+#adj_full_3 = acast(rbind(melt(adj_2[201:300])), Var1~Var2, sum)
+#adj_full_4 = acast(rbind(melt(adj_2[301:400])), Var1~Var2, sum)
+#adj_full_5 = acast(rbind(melt(adj_2[401:500])), Var1~Var2, sum)
+#adj_full_6 = acast(rbind(melt(adj_2[501:600])), Var1~Var2, sum)
+#adj_full_7 = acast(rbind(melt(adj_2[601:700])), Var1~Var2, sum)
+#adj_full_8 = acast(rbind(melt(adj_2[701:800])), Var1~Var2, sum)
+#adj_full_9 = acast(rbind(melt(adj_2[801:900])), Var1~Var2, sum)
+#adj_full_10 = acast(rbind(melt(adj_2[901:1000])), Var1~Var2, sum)
 
-adj_full_split_2 = acast(rbind(melt(adj_full_1), melt(adj_full_2), melt(adj_full_3), melt(adj_full_4), melt(adj_full_5), melt(adj_full_6), melt(adj_full_7), melt(adj_full_8), melt(adj_full_9), melt(adj_full_10)), Var1~Var2, sum)
+stab_full_split_2 = adj_full_1/100
 
-rm(adj_full_10, adj_full_9, adj_full_8, adj_full_7, adj_full_6, adj_full_5, adj_full_4, adj_full_3, adj_full_1, adj_2) #save memory and remove no longer needed matrices
+#adj_full_split_2 = acast(rbind(melt(adj_full_1), melt(adj_full_2), melt(adj_full_3), melt(adj_full_4), melt(adj_full_5), melt(adj_full_6), melt(adj_full_7), melt(adj_full_8), melt(adj_full_9), melt(adj_full_10)), Var1~Var2, sum)
 
-stab_full_split_2 = adj_full_split_2/1000
+#rm(adj_full_10, adj_full_9, adj_full_8, adj_full_7, adj_full_6, adj_full_5, adj_full_4, adj_full_3, adj_full_1, adj_2) #save memory and remove no longer needed matrices
+
+#stab_full_split_2 = adj_full_split_2/1000
 
 ```
 
@@ -133,38 +137,14 @@ subs2 = data.frame("Key" = as.factor(colnames(stab_full_split_2))) # Split 2
 
 ```
 
-# Agglomerative Clustering Function
-```{r, echo = F, include=F}
-
-hclust = function(data,x,dmat,mc1,hyb1){
-  x <- scale(data)
-  assign("x",x,envir = .GlobalEnv)#normalize adj_2acency matrix prior to clustering 
-  dmat <- 1-cor(x, method = "spearman")
-  assign("dmat",dmat,envir = .GlobalEnv)
-  dimnames(dmat) <- list(1:nrow(dmat),1:nrow(dmat)) #add subject ID as rownames in matrix 
-  # find and print MCs
-  mc1 <- mutualCluster(distances=dmat,plot=F)
-  assign("mc1",mc1,envir = .GlobalEnv)
-  # find hybrid hierarchical model and explore it
-  hyb1 <- hybridHclust(t(x),mc1,trace=TRUE)
-  assign("hyb1",hyb1,envir = .GlobalEnv)
-}
-
-```  
-
-# Agglomerative Clustering Split 1 
+# Louvain Final Clustering Split 1 
 ```{r, echo =F, include=F}
+library(igraph)
 
-hclust(stab_full_split_1)
+G1 <- graph.adjacency(stab_full_split_1, mode = "undirected", weighted = TRUE, diag = TRUE)
+clusterlouvain <- cluster_louvain(G1)
+subs$cluster = factor(clusterlouvain$membership)
 
-```
-
-# Split 1 Dendrogram 
-```{r, echo =F}
-
-plot(hyb1)
-hyb=cutree(hyb1,4) #according to dendrogram a 4 cluster solution seems appropriate, the number after the comma indicates the number of cluster extracted. 
-subs$cluster= factor(hyb) #add hierarchical cluster assignments to cluster data frame that includes subject ID.
 python_df$Key = factor(python_df$Key)
 Split_1 = subs %>% inner_join(python_df, by = c("Key")) #add cluster assignments to dataset 
 
@@ -173,12 +153,12 @@ Split_1 = subs %>% inner_join(python_df, by = c("Key")) #add cluster assignments
 # Heatmap Split 1
 ```{r, echo = F}
 
-gr.row <- hyb # hierarchical cluster assignments
+gr.row <- subs$cluster # hierarchical cluster assignments
 col1 <- brewer.pal(6, "Set1")
 
-heatmap.2(dmat,
-          Rowv=as.dendrogram(hyb1),
-          Colv=as.dendrogram(hyb1),
+heatmap.2(stab_full_split_1,
+          #Rowv=as.dendrogram(hyb1),
+          #Colv=as.dendrogram(hyb1),
           RowSideColors=col1[gr.row],
           col=viridis_pal(),
           labRow = F,
@@ -190,33 +170,26 @@ heatmap.2(dmat,
 
 #### Repaeat steps from Split 1 on Split 2 ####
 
-# Agglomerative Clustering Split 2 
 ```{r, echo =F, include=F}
 
-hclust(stab_full_split_2)
+G2 <- graph.adjacency(stab_full_split_2, mode = "undirected", weighted = TRUE, diag = TRUE)
+clusterlouvain2 <- cluster_louvain(G2)
+subs2$cluster = factor(clusterlouvain2$membership)
 
-```
-
-# Split 2 Dendrogram
-```{r, echo =F}
-
-plot(hyb1)
-hyb=cutree(hyb1,4) #according to dendrogram a 4 cluster solution seems appropriate, the number after the comma indicates the number of cluster extracted. 
-subs2$cluster= factor(hyb) #add hierarchical cluster assignments to cluster data frame that includes subject ID.
 python_df2$Key = factor(python_df2$Key)
-Split_2 = subs2 %>% inner_join(python_df2, by = c("Key"))
+Split_2 = subs2 %>% inner_join(python_df2, by = c("Key")) #add cluster assignments to dataset 
 
 ```
 
-# Heatmap Split 2 
+# Heatmap Split 1
 ```{r, echo = F}
 
-#In order to show both RowSideColors and ColSideColors you have to obtain cluster assignments for rows and columns of the matrix separately. 
-gr.row <- hyb # hierarchical cluster assignments
+gr.row <- subs2$cluster # hierarchical cluster assignments
+col1 <- brewer.pal(6, "Set1")
 
-heatmap.2(dmat,
-          Rowv=as.dendrogram(hyb1),
-          Colv=as.dendrogram(hyb1),
+heatmap.2(stab_full_split_2,
+          #Rowv=as.dendrogram(hyb1),
+          #Colv=as.dendrogram(hyb1),
           RowSideColors=col1[gr.row],
           col=viridis_pal(),
           labRow = F,
