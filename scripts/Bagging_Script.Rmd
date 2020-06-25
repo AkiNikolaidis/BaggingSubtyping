@@ -63,21 +63,23 @@ for(i in 1:length(df_list)){
 }
 
 adj_full_1 = acast(rbind(melt(adj[1:100])), Var1~Var2, sum)
-adj_full_2 = acast(rbind(melt(adj[101:200])), Var1~Var2, sum)
-adj_full_3 = acast(rbind(melt(adj[201:300])), Var1~Var2, sum)
-adj_full_4 = acast(rbind(melt(adj[301:400])), Var1~Var2, sum)
-adj_full_5 = acast(rbind(melt(adj[401:500])), Var1~Var2, sum)
-adj_full_6 = acast(rbind(melt(adj[501:600])), Var1~Var2, sum)
-adj_full_7 = acast(rbind(melt(adj[601:700])), Var1~Var2, sum)
-adj_full_8 = acast(rbind(melt(adj[701:800])), Var1~Var2, sum)
-adj_full_9 = acast(rbind(melt(adj[801:900])), Var1~Var2, sum)
-adj_full_10 = acast(rbind(melt(adj[901:1000])), Var1~Var2, sum)
+#adj_full_2 = acast(rbind(melt(adj_2[101:200])), Var1~Var2, sum)
+#adj_full_3 = acast(rbind(melt(adj_2[201:300])), Var1~Var2, sum)
+#adj_full_4 = acast(rbind(melt(adj_2[301:400])), Var1~Var2, sum)
+#adj_full_5 = acast(rbind(melt(adj_2[401:500])), Var1~Var2, sum)
+#adj_full_6 = acast(rbind(melt(adj_2[501:600])), Var1~Var2, sum)
+#adj_full_7 = acast(rbind(melt(adj_2[601:700])), Var1~Var2, sum)
+#adj_full_8 = acast(rbind(melt(adj_2[701:800])), Var1~Var2, sum)
+#adj_full_9 = acast(rbind(melt(adj_2[801:900])), Var1~Var2, sum)
+#adj_full_10 = acast(rbind(melt(adj_2[901:1000])), Var1~Var2, sum)
 
-adj_full_split_1 = acast(rbind(melt(adj_full_1), melt(adj_full_2), melt(adj_full_3), melt(adj_full_4), melt(adj_full_5), melt(adj_full_6), melt(adj_full_7), melt(adj_full_8), melt(adj_full_9), melt(adj_full_10)), Var1~Var2, sum)
+stab_full_split_1 = adj_full_1/100
 
-rm(adj_full_10, adj_full_9, adj_full_8, adj_full_7, adj_full_6, adj_full_5, adj_full_4, adj_full_3, adj_full_1, adj) #save memory and remove no longer needed matrices
+#adj_full_split_1 = acast(rbind(melt(adj_full_1), melt(adj_full_2), melt(adj_full_3), melt(adj_full_4), melt(adj_full_5), melt(adj_full_6), melt(adj_full_7), melt(adj_full_8), melt(adj_full_9), melt(adj_full_10)), Var1~Var2, sum)
 
-stab_full_split_1 = adj_full_split_1/1000 #divide the summed matrix by the number of total matrices to obtain final stability matrix
+#rm(adj_full_10, adj_full_9, adj_full_8, adj_full_7, adj_full_6, adj_full_5, adj_full_4, adj_full_3, adj_full_1, adj) #save memory and remove no longer needed matrices
+
+#stab_full_split_1 = adj_full_split_1/1000 #divide the summed matrix by the number of total matrices to obtain final stability matrix
 
 ```
 
@@ -106,21 +108,23 @@ for(i in 1:length(df_list2)){
 }
 
 adj_full_1 = acast(rbind(melt(adj_2[1:100])), Var1~Var2, sum)
-adj_full_2 = acast(rbind(melt(adj_2[101:200])), Var1~Var2, sum)
-adj_full_3 = acast(rbind(melt(adj_2[201:300])), Var1~Var2, sum)
-adj_full_4 = acast(rbind(melt(adj_2[301:400])), Var1~Var2, sum)
-adj_full_5 = acast(rbind(melt(adj_2[401:500])), Var1~Var2, sum)
-adj_full_6 = acast(rbind(melt(adj_2[501:600])), Var1~Var2, sum)
-adj_full_7 = acast(rbind(melt(adj_2[601:700])), Var1~Var2, sum)
-adj_full_8 = acast(rbind(melt(adj_2[701:800])), Var1~Var2, sum)
-adj_full_9 = acast(rbind(melt(adj_2[801:900])), Var1~Var2, sum)
-adj_full_10 = acast(rbind(melt(adj_2[901:1000])), Var1~Var2, sum)
+#adj_full_2 = acast(rbind(melt(adj_2[101:200])), Var1~Var2, sum)
+#adj_full_3 = acast(rbind(melt(adj_2[201:300])), Var1~Var2, sum)
+#adj_full_4 = acast(rbind(melt(adj_2[301:400])), Var1~Var2, sum)
+#adj_full_5 = acast(rbind(melt(adj_2[401:500])), Var1~Var2, sum)
+#adj_full_6 = acast(rbind(melt(adj_2[501:600])), Var1~Var2, sum)
+#adj_full_7 = acast(rbind(melt(adj_2[601:700])), Var1~Var2, sum)
+#adj_full_8 = acast(rbind(melt(adj_2[701:800])), Var1~Var2, sum)
+#adj_full_9 = acast(rbind(melt(adj_2[801:900])), Var1~Var2, sum)
+#adj_full_10 = acast(rbind(melt(adj_2[901:1000])), Var1~Var2, sum)
 
-adj_full_split_2 = acast(rbind(melt(adj_full_1), melt(adj_full_2), melt(adj_full_3), melt(adj_full_4), melt(adj_full_5), melt(adj_full_6), melt(adj_full_7), melt(adj_full_8), melt(adj_full_9), melt(adj_full_10)), Var1~Var2, sum)
+stab_full_split_2 = adj_full_1/100
 
-rm(adj_full_10, adj_full_9, adj_full_8, adj_full_7, adj_full_6, adj_full_5, adj_full_4, adj_full_3, adj_full_1, adj_2) #save memory and remove no longer needed matrices
+#adj_full_split_2 = acast(rbind(melt(adj_full_1), melt(adj_full_2), melt(adj_full_3), melt(adj_full_4), melt(adj_full_5), melt(adj_full_6), melt(adj_full_7), melt(adj_full_8), melt(adj_full_9), melt(adj_full_10)), Var1~Var2, sum)
 
-stab_full_split_2 = adj_full_split_2/1000
+#rm(adj_full_10, adj_full_9, adj_full_8, adj_full_7, adj_full_6, adj_full_5, adj_full_4, adj_full_3, adj_full_1, adj_2) #save memory and remove no longer needed matrices
+
+#stab_full_split_2 = adj_full_split_2/1000
 
 ```
 
