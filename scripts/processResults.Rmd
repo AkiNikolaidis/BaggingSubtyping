@@ -40,7 +40,9 @@ bag_split = function(bootstrap_dir, full_split_path){
   
   globalEdgeList <- reduce(purrr::map(boot.data, ~{
     dedup <- . %>% filter(!duplicated(.)) # drop the duplicates
-    adj <- +(outer(dedup$cluster, dedup$cluster, FUN='=='))*!diag(nrow(dedup)) # get the adjacency matrix
+    # get the adjacency matrix:
+    adjArray <- +(outer(dedup$cluster, dedup$cluster, FUN='==')) # as array
+    adj <- apply(adjArray, 3L, c)*!diag(nrow(dedup)) # as matrix
     rownames(adj) <- colnames(adj) <- dedup$URSI # re-attach the subject IDs
     # generate the edge list (by converting it to a graph, then extracting the edge list)
     el <- as_edgelist(graph_from_adjacency_matrix(adj, mode = "lower", # just the lower triangle
