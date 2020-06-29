@@ -13,6 +13,7 @@ output:
 
 ```{r, echo = F, include = F}
 
+
 #load Libraries 
 library(knitr)
 library(dplyr)
@@ -36,6 +37,8 @@ memory.limit(10000000000000)
 ```
 
 ```{r, warning = F, echo=F, include=F}
+
+### This script must be saved in the same folder as the bootstrapped cluster output CSVs in order for the data to read in 
 
 # read in data from cluster output into a list
 #setwd("C:/Users/jacob.derosa/Desktop/Scripts/Baggin_Subtyping/CBCL/Boot_Data")
