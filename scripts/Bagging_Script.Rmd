@@ -59,7 +59,7 @@ adj = list() #list of adjacency matrices
 boot_mask = list() #contains data frame of cluster outputs and subject IDS. 
 boot_NA_mask = list() #list of subjects that were not included in the bootsrapped data and contain NA's, used to generate a list of subjects that will be removed from the adjacency matrix
 mask_list = list() #list of subjects to be removed from the adjacency matrix
-mask = list() #l
+mask = list() ##list of adjacency matrices 
 
 for(i in 1:length(df_list)){
   boot[[i]] = df_list[[i]]
@@ -106,7 +106,7 @@ list2 = list() #list of subjects to be removed from the adjacency matrix
 boot_mask2 = list() #contains data frame of cluster outputs and subject IDS. 
 boot_NA_mask2 = list() #list of subjects that were not included in the bootsrapped data and contain NA's, used to generate a list of subjects that will be removed from the adjacency matrix
 mask_list2 = list() #list of subjects to be removed from the adjacency matrix
-mask2 = list() #l
+mask2 = list() #list of mask adjacency matrices 
 
 adj_2 = list() #list of adjacency matrices 
 for(i in 1:length(df_list2)){
@@ -138,8 +138,6 @@ adj_full_2 = acast(rbind(melt(adj_2[1:100])), Var1~Var2, sum)
 mask_full_2 = acast(rbind(melt(mask2[1:100])), Var1~Var2, sum)
 stab_full_split_2 = adj_full_2/mask_full_2
 diag(stab_full_split_2) = 0
-
-#write.csv(stab_full_split_2, "C:/Users/jacob.derosa/Downloads/stab_2.csv")
 ```
 
 ```{r, include=F, echo = F}
@@ -152,12 +150,12 @@ subs2 = data.frame("Key" = as.factor(colnames(stab_full_split_2))) # Split 2
 
 ```
 
-
+# Louvain Final Clustering Solutions
 ```{r, echo =F, include=F}
 
-G1 <- graph.adjacency(stab_full_split_1, mode = "undirected", weighted = TRUE, diag = TRUE)
-clusterlouvain <- cluster_louvain(G1)
-subs$cluster = factor(clusterlouvain$membership)
+G1 <- graph.adjacency(stab_full_split_1, mode = "undirected", weighted = TRUE, diag = TRUE) #turn final stability matrix into a graph, Weighted NEEDS = TRUE, if not there will be over 100 cluster assignments!!!
+clusterlouvain <- cluster_louvain(G1) 
+subs$cluster = factor(clusterlouvain$membership) 
 
 python_df$Key = factor(python_df$Key)
 Split_1 = subs %>% inner_join(python_df, by = c("Key")) %>% mutate(cluster = ifelse(cluster == 1, 3,
@@ -180,7 +178,7 @@ Split_2 = subs2 %>% inner_join(python_df2, by = c("Key")) #add cluster assignmen
 
 ```{r, echo = F}
 
-gr.row <- subs$cluster # hierarchical cluster assignments
+gr.row <- subs$cluster # cluster assignments
 col1 <- brewer.pal(6, "Set1")
 
 heatmap.2(stab_full_split_1,
@@ -190,19 +188,11 @@ heatmap.2(stab_full_split_1,
           col=viridis_pal(),
           labRow = F,
           labCol = F,
-          main = "Heatmap",
+          main = "Split 1 Heatmap",
           trace = "none")
 
 
-#library(gplots)
-#heatmap.2(stab_full_split_1,dendrogram='none',RowSideColors=col1[gr.row],
-#          col=viridis_pal(),
-##          labRow = F,
-#          labCol = F,
-#          main = "Heatmap",
-#          trace = "none")
-
-gr.row <- subs2$cluster # hierarchical cluster assignments
+gr.row <- subs2$cluster # cluster assignments
 col1 <- brewer.pal(6, "Set1")
 
 heatmap.2(stab_full_split_2,
@@ -212,7 +202,7 @@ heatmap.2(stab_full_split_2,
           col=viridis_pal(),
           labRow = F,
           labCol = F,
-          main = "Heatmap",
+          main = "Split 2 Heatmap",
           trace = "none")
 ```
 
