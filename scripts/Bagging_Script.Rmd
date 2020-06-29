@@ -50,8 +50,8 @@ setwd("C:/Users/jacob.derosa/Desktop/Scripts/Baggin_Subtyping/CBCL/home/jderosa/
 
 my_data = lapply(list.files(pattern = glob2rx("*CBCL_Cluster_1*.csv")), read.csv, header = T, sep = ",") 
 
-python_df = read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Baggin_Subtyping/CBCL/Splits/CBCL_Split_1.csv", header = T, sep = ",") %>% rename(Key = X)
-python_list = list(python_df) #put python df into list that will merged with sample split dfs 
+python_df = read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Baggin_Subtyping/CBCL/Splits/CBCL_Split_1.csv", header = T, sep = ",") %>% rename(Key = X) #make sure subject Key is the first column of your dataframe
+python_list = list(python_df[1])#put python df into list that will merged with sample split dfs and select only subject KEY 
 df_list = Map(full_join, my_data, python_list, by = c("Key")) #Combine clustered data with data frame that contains CBCL scores and subject ID 
 
 #initialize empty lists
@@ -99,7 +99,7 @@ diag(stab_full_split_1) = 0
 
 my_data2 = lapply(list.files(pattern = glob2rx("*CBCL_Cluster_2*.csv")), read.csv, header = T, sep = ",")
 python_df2 = read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Baggin_Subtyping/CBCL/Splits/CBCL_Split_2.csv", header = T, sep = ",") %>% rename(Key = X) 
-python_list2 = list(python_df) 
+python_list2 = list(python_df2[1]) 
 
 df_list2 = Map(full_join, my_data2, python_list2, by = c("Key"))
 
