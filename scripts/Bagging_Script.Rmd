@@ -1,7 +1,14 @@
 ---
-title: "Bagging Pipeline"
+title: "Bagging Pipeline: CBCL"
 author: "Jacob DeRosa"
-output: html_document
+output:
+  html_document:
+    number_sections: no
+    toc: yes
+    toc_float:
+      collapsed: no
+      smooth_scroll: yes
+      
 ---
 
 ```{r, echo = F, include = F}
@@ -16,14 +23,14 @@ library(stringi)
 library(ggplot2)
 library(ggiraphExtra)
 library(gplots)
-#install.packages("https://cran.r-project.org/src/contrib/Archive/hybridHclust/hybridHclust_1.0-5.tar.gz", repos = NULL, type = "source")
-library(hybridHclust)
 library(RColorBrewer)
 library(viridis)
 library(viridis)
 library(corrplot)
+library(igraph)
+library(psych)   
 
-#increase to max memory limit if using windows -- ash out for max 
+#increase to max memory limit if using windows -- hash out for mac 
 memory.limit(10000000000000) 
 
 ```
@@ -31,16 +38,16 @@ memory.limit(10000000000000)
 ```{r, warning = F, echo=F, include=F}
 
 # read in data from cluster output into a list
-setwd("C:/Users/jacob.derosa/Desktop/Scripts/CBCL_Split_Data/Boot_Data")
+#setwd("C:/Users/jacob.derosa/Desktop/Scripts/Baggin_Subtyping/CBCL/Boot_Data")
+setwd("C:/Users/jacob.derosa/Desktop/Scripts/Baggin_Subtyping/CBCL/home/jderosa/Documents/Baggin_Subtyping/Output/data/csv")
 
 ```
 
-# Split 1 Bagging 
 ```{r, warning = F, echo=F, include=F}
 
-my_data = lapply(list.files(pattern = glob2rx("*CBCL_Cluster_1*.csv")), read.csv, header = T, sep = ",")
-#Split 1 dataset 
-python_df = read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Full_CBCL_Splits/All_CBCL_Splits/CBCL_Split_1.csv", header = T, sep = ",") %>% select(X) %>% rename(Key = X)
+my_data = lapply(list.files(pattern = glob2rx("*CBCL_Cluster_1*.csv")), read.csv, header = T, sep = ",") 
+
+python_df = read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Baggin_Subtyping/CBCL/Splits/CBCL_Split_1.csv", header = T, sep = ",") %>% rename(Key = X)
 python_list = list(python_df) #put python df into list that will merged with sample split dfs 
 df_list = Map(full_join, my_data, python_list, by = c("Key")) #Combine clustered data with data frame that contains CBCL scores and subject ID 
 
@@ -49,6 +56,10 @@ boot = list() #contains data frame of cluster outputs and subject IDS.
 boot_NA = list() #list of subjects that were not included in the bootsrapped data and contain NA's, used to generate a list of subjects that will be removed from the adjacency matrix
 list = list() #list of subjects to be removed from the adjacency matrix
 adj = list() #list of adjacency matrices 
+boot_mask = list() #contains data frame of cluster outputs and subject IDS. 
+boot_NA_mask = list() #list of subjects that were not included in the bootsrapped data and contain NA's, used to generate a list of subjects that will be removed from the adjacency matrix
+mask_list = list() #list of subjects to be removed from the adjacency matrix
+mask = list() #l
 
 for(i in 1:length(df_list)){
   boot[[i]] = df_list[[i]]
@@ -60,40 +71,43 @@ for(i in 1:length(df_list)){
   diag(adj[[i]]) <- 0 #set the diagonal of the adjacency matrix to 0
   dimnames(adj[[i]]) <- rep(list(boot[[i]]$Key),2) #Add subject ID to the matrix as column and row headers 
   adj[[i]] = adj[[i]][!rownames(adj[[i]]) %in% list[[i]], !colnames(adj[[i]]) %in% list[[i]]] #remove subjects who had a cluster of 0 with form the previously generated list. 
+  ## Create Masks 
+  boot_mask[[i]] = df_list[[i]]
+  boot_mask[[i]] = df_list[[i]][!duplicated(df_list[[i]]$Key),]#remove duplicate subject IDs from bootstrapped data. If no duplicate data is present no subjects will be removed (ex: non bootstrapped data set)
+  boot_mask[[i]]$cluster = boot_mask[[i]]$cluster %>% replace_na(0)
+  boot_mask[[i]] = boot_mask[[i]] %>% mutate(cluster = ifelse(cluster == 0, 0, 1)) #create mask matrix, 1 if included in the boostrapped iteration, 0 if not included. 
+  #Give all subjects a 0 as a cluster label of 0 that did not go into the dataset 
+  boot_NA_mask[[i]] = boot_mask[[i]] %>% filter(cluster == 0) #create a list of all subject IDs that have a cluster label of 0 (important for when their row and column are removed from the adjacency matrix)
+  mask_list[[i]] = boot_NA_mask[[i]]$Key #assign subjects wuth a 0 to this list 
+  mask[[i]] <- +(outer(boot_mask[[i]]$cluster, boot_mask[[i]]$cluster, FUN='=='))*!diag(dim(boot_mask[[i]])[1]) #create the adjacency matrix with 1 and 0: 1 for subjects that have the same cluster assignment as another subject and 0 for subjects that do not have the same cluster assignment. 
+  diag(mask[[i]]) <- 0 #set the diagonal of the adjacency matrix to 0
+  dimnames(mask[[i]]) <- rep(list(boot_mask[[i]]$Key),2) #Add subject ID to the matrix as column and row headers 
+  mask[[i]] = mask[[i]][!rownames(mask[[i]]) %in% mask_list[[i]], !colnames(mask[[i]]) %in% mask_list[[i]]] 
 }
 
+
 adj_full_1 = acast(rbind(melt(adj[1:100])), Var1~Var2, sum)
-#adj_full_2 = acast(rbind(melt(adj_2[101:200])), Var1~Var2, sum)
-#adj_full_3 = acast(rbind(melt(adj_2[201:300])), Var1~Var2, sum)
-#adj_full_4 = acast(rbind(melt(adj_2[301:400])), Var1~Var2, sum)
-#adj_full_5 = acast(rbind(melt(adj_2[401:500])), Var1~Var2, sum)
-#adj_full_6 = acast(rbind(melt(adj_2[501:600])), Var1~Var2, sum)
-#adj_full_7 = acast(rbind(melt(adj_2[601:700])), Var1~Var2, sum)
-#adj_full_8 = acast(rbind(melt(adj_2[701:800])), Var1~Var2, sum)
-#adj_full_9 = acast(rbind(melt(adj_2[801:900])), Var1~Var2, sum)
-#adj_full_10 = acast(rbind(melt(adj_2[901:1000])), Var1~Var2, sum)
-
-stab_full_split_1 = adj_full_1/100
-
-#adj_full_split_1 = acast(rbind(melt(adj_full_1), melt(adj_full_2), melt(adj_full_3), melt(adj_full_4), melt(adj_full_5), melt(adj_full_6), melt(adj_full_7), melt(adj_full_8), melt(adj_full_9), melt(adj_full_10)), Var1~Var2, sum)
-
-#rm(adj_full_10, adj_full_9, adj_full_8, adj_full_7, adj_full_6, adj_full_5, adj_full_4, adj_full_3, adj_full_1, adj) #save memory and remove no longer needed matrices
-
-#stab_full_split_1 = adj_full_split_1/1000 #divide the summed matrix by the number of total matrices to obtain final stability matrix
-
+mask_full_1 = acast(rbind(melt(mask[1:100])), Var1~Var2, sum)
+stab_full_split_1 = adj_full_1/mask_full_1 
+diag(stab_full_split_1) = 0
 ```
 
-# Split 2 Bagging
 ```{r, warning = F, echo=F, include=F}
 
 my_data2 = lapply(list.files(pattern = glob2rx("*CBCL_Cluster_2*.csv")), read.csv, header = T, sep = ",")
-python_df2 = read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Full_CBCL_Splits/All_CBCL_Splits/CBCL_Split_2.csv", header = T, sep = ",") %>% rename(Key = X)
+python_df2 = read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Baggin_Subtyping/CBCL/Splits/CBCL_Split_2.csv", header = T, sep = ",") %>% rename(Key = X) 
 python_list2 = list(python_df) 
-df_list2 = Map(full_join, my_data2, python_list, by = c("Key"))
+
+df_list2 = Map(full_join, my_data2, python_list2, by = c("Key"))
 
 boot_2 = list() #contains data frame of cluster outputs and subject IDS. 
 boot_2_NA = list() #list of subjects that were not included in the boot_2strapped data and contain NA's, used to generate a list of subjects that will be 
 list2 = list() #list of subjects to be removed from the adjacency matrix
+boot_mask2 = list() #contains data frame of cluster outputs and subject IDS. 
+boot_NA_mask2 = list() #list of subjects that were not included in the bootsrapped data and contain NA's, used to generate a list of subjects that will be removed from the adjacency matrix
+mask_list2 = list() #list of subjects to be removed from the adjacency matrix
+mask2 = list() #l
+
 adj_2 = list() #list of adjacency matrices 
 for(i in 1:length(df_list2)){
   boot_2[[i]] = df_list2[[i]]
@@ -105,52 +119,65 @@ for(i in 1:length(df_list2)){
   diag(adj_2[[i]]) <- 0 #set the diagonal of the adj matrix to 0
   dimnames(adj_2[[i]]) <- rep(list(boot_2[[i]]$Key),2) #Add subject ID to the matrix as column and row headers 
   adj_2[[i]] = adj_2[[i]][!rownames(adj_2[[i]]) %in% list2[[i]], !colnames(adj_2[[i]]) %in% list2[[i]]] #remove subjects who had a cluster of 0 with form the previously generated list. 
+  
+  boot_mask2[[i]] = df_list2[[i]]
+  boot_mask2[[i]] = df_list2[[i]][!duplicated(df_list2[[i]]$Key),]#remove duplicate subject IDs from bootstrapped data. If no duplicate data is present no subjects will be removed (ex: non bootstrapped data set)
+  boot_mask2[[i]]$cluster = boot_mask2[[i]]$cluster %>% replace_na(0)
+  boot_mask2[[i]] = boot_mask2[[i]] %>% mutate(cluster = ifelse(cluster == 0, 0, 1))
+  #Give all subjects a 0 as a cluster label of 0 that did not go into the dataset 
+  boot_NA_mask2[[i]] = boot_mask2[[i]] %>% filter(cluster == 0) #create a list of all subject IDs that have a cluster label of 0 (important for when their row and column are removed from the adjacency matrix)
+  mask_list2[[i]] = boot_NA_mask2[[i]]$Key #assign subjects wuth a 0 to this list 
+  mask2[[i]] <- +(outer(boot_mask2[[i]]$cluster, boot_mask2[[i]]$cluster, FUN='=='))*!diag(dim(boot_mask2[[i]])[1]) #create the adjacency matrix with 1 and 0: 1 for subjects that have the same cluster assignment as another subject and 0 for subjects that do not have the same cluster assignment. 
+  diag(mask2[[i]]) <- 0 #set the diagonal of the adjacency matrix to 0
+  dimnames(mask2[[i]]) <- rep(list(boot_mask2[[i]]$Key),2) #Add subject ID to the matrix as column and row headers 
+  mask2[[i]] = mask2[[i]][!rownames(mask2[[i]]) %in% mask_list2[[i]], !colnames(mask2[[i]]) %in% mask_list2[[i]]] 
+
 }
 
-adj_full_1 = acast(rbind(melt(adj_2[1:100])), Var1~Var2, sum)
-#adj_full_2 = acast(rbind(melt(adj_2[101:200])), Var1~Var2, sum)
-#adj_full_3 = acast(rbind(melt(adj_2[201:300])), Var1~Var2, sum)
-#adj_full_4 = acast(rbind(melt(adj_2[301:400])), Var1~Var2, sum)
-#adj_full_5 = acast(rbind(melt(adj_2[401:500])), Var1~Var2, sum)
-#adj_full_6 = acast(rbind(melt(adj_2[501:600])), Var1~Var2, sum)
-#adj_full_7 = acast(rbind(melt(adj_2[601:700])), Var1~Var2, sum)
-#adj_full_8 = acast(rbind(melt(adj_2[701:800])), Var1~Var2, sum)
-#adj_full_9 = acast(rbind(melt(adj_2[801:900])), Var1~Var2, sum)
-#adj_full_10 = acast(rbind(melt(adj_2[901:1000])), Var1~Var2, sum)
+adj_full_2 = acast(rbind(melt(adj_2[1:100])), Var1~Var2, sum)
+mask_full_2 = acast(rbind(melt(mask2[1:100])), Var1~Var2, sum)
+stab_full_split_2 = adj_full_2/mask_full_2
+diag(stab_full_split_2) = 0
 
-stab_full_split_2 = adj_full_1/100
-
-#adj_full_split_2 = acast(rbind(melt(adj_full_1), melt(adj_full_2), melt(adj_full_3), melt(adj_full_4), melt(adj_full_5), melt(adj_full_6), melt(adj_full_7), melt(adj_full_8), melt(adj_full_9), melt(adj_full_10)), Var1~Var2, sum)
-
-#rm(adj_full_10, adj_full_9, adj_full_8, adj_full_7, adj_full_6, adj_full_5, adj_full_4, adj_full_3, adj_full_1, adj_2) #save memory and remove no longer needed matrices
-
-#stab_full_split_2 = adj_full_split_2/1000
-
+#write.csv(stab_full_split_2, "C:/Users/jacob.derosa/Downloads/stab_2.csv")
 ```
 
 ```{r, include=F, echo = F}
 
 #obtain Key (subject identifier) from the stability matrices and place them into a new data frame 
-subs = data.frame("Key" = as.factor(colnames(stab_full_split_1))) # Split 1 
+subs = data.frame("Key" = as.factor(colnames(stab_full_split_1)))# Split 1 
 
 subs2 = data.frame("Key" = as.factor(colnames(stab_full_split_2))) # Split 2
 
+
 ```
 
-# Louvain Final Clustering Split 1 
+
 ```{r, echo =F, include=F}
-library(igraph)
 
 G1 <- graph.adjacency(stab_full_split_1, mode = "undirected", weighted = TRUE, diag = TRUE)
 clusterlouvain <- cluster_louvain(G1)
 subs$cluster = factor(clusterlouvain$membership)
 
 python_df$Key = factor(python_df$Key)
-Split_1 = subs %>% inner_join(python_df, by = c("Key")) #add cluster assignments to dataset 
+Split_1 = subs %>% inner_join(python_df, by = c("Key")) %>% mutate(cluster = ifelse(cluster == 1, 3,
+                                                                                   ifelse(cluster == 2, 1,
+                                                                                          ifelse(cluster == 3,2,
+                                                                                                 ifelse(cluster == 4, 4,NA)))))#add cluster assignments to dataset 
+
+
+G2 <- graph.adjacency(stab_full_split_2, mode = "undirected", weighted = TRUE, diag = TRUE)
+clusterlouvain2 <- cluster_louvain(G2)
+subs2$cluster = factor(clusterlouvain2$membership)
+
+python_df2$Key = factor(python_df2$Key)
+Split_2 = subs2 %>% inner_join(python_df2, by = c("Key")) #add cluster assignments to dataset 
+
 
 ```
 
-# Heatmap Split 1
+# ***Heatmaps***
+
 ```{r, echo = F}
 
 gr.row <- subs$cluster # hierarchical cluster assignments
@@ -166,23 +193,14 @@ heatmap.2(stab_full_split_1,
           main = "Heatmap",
           trace = "none")
 
-```
 
-#### Repaeat steps from Split 1 on Split 2 ####
-
-```{r, echo =F, include=F}
-
-G2 <- graph.adjacency(stab_full_split_2, mode = "undirected", weighted = TRUE, diag = TRUE)
-clusterlouvain2 <- cluster_louvain(G2)
-subs2$cluster = factor(clusterlouvain2$membership)
-
-python_df2$Key = factor(python_df2$Key)
-Split_2 = subs2 %>% inner_join(python_df2, by = c("Key")) #add cluster assignments to dataset 
-
-```
-
-# Heatmap Split 1
-```{r, echo = F}
+#library(gplots)
+#heatmap.2(stab_full_split_1,dendrogram='none',RowSideColors=col1[gr.row],
+#          col=viridis_pal(),
+##          labRow = F,
+#          labCol = F,
+#          main = "Heatmap",
+#          trace = "none")
 
 gr.row <- subs2$cluster # hierarchical cluster assignments
 col1 <- brewer.pal(6, "Set1")
@@ -196,14 +214,15 @@ heatmap.2(stab_full_split_2,
           labCol = F,
           main = "Heatmap",
           trace = "none")
-
 ```
 
-# Prepare Mean Max Correlation Matching 
+
 ```{r, echo = F, include = F}
+
 #From data sets for each split with clusters and CBCL scores begin by grouping CBCL scores by cluster then create mean for each CBCL subscale summarised by cluster
 list = list(`Split 1` = Split_1, `Split 2` = Split_2)
 split = list()
+
 
 for (i in 1:length(list)){
   split[[i]] = list[[i]] %>%
@@ -218,14 +237,14 @@ for (i in 1:length(list)){
   rename("Social Problems" = CBCL_SP_T) %>%
     group_by(cluster) %>%
     summarise(
-    AD = mean(`Anxious Depressed`),
-    RB = mean(`Rule Breaking`),
-    WD = mean(`Withdrawn Depressed`) ,
-    TP = mean(`Thought Problems`) ,
-    SC = mean(`Sommatic Complaints`) ,
-    AP = mean(`Attention Problems`) ,
-    AB = mean(`Agressive Behavior`) ,
-    SP = mean(`Social Problems`))
+    `Anxious Depressed` = mean(`Anxious Depressed`),
+    `Rule Breaking` = mean(`Rule Breaking`),
+    `Withdrawn Depressed` = mean(`Withdrawn Depressed`) ,
+    `Thought Problems` = mean(`Thought Problems`) ,
+    `Sommatic Complaints` = mean(`Sommatic Complaints`) ,
+    `Attention Problems` = mean(`Attention Problems`) ,
+    `Agressive Behavior` = mean(`Agressive Behavior`) ,
+    `Social Problems` = mean(`Social Problems`))
   names(split)[i] = names(list)[[i]]
 }
 
@@ -300,11 +319,10 @@ reuslts_split = data.frame(results[1])
 
 ```
 
-# ***Cluster Profiles*** 
+## ***Cluster Profiles*** 
 
 # Split 1
-```{r, echo = F}
-#library(plyr)
+```{r, echo = F, fig.height= 10, fig.width=15}
 
 data <- plyr::ldply(split[1], data.frame)[-1]
 
@@ -313,7 +331,8 @@ colors_line = c(scales::alpha("#440154FF", 1),
                 scales::alpha("#73D055FF", 1),
                 scales::alpha("#FDE725FF", 1))
 
-data = gather(data, "Var", "Mean", `AD`:`AB`, factor_key = F) %>% rename(Subtype = cluster)
+data = gather(data, "Var", "Mean", `Anxious.Depressed`:`Social.Problems`, factor_key = F) %>% rename(Subtype = cluster)
+data$Subtype = factor(data$Subtype)
 #Turn your 'treatment' column into a character vector
 data$Var <- as.character(data$Var)
 #Then turn it back into a factor with the levels in the correct order
@@ -323,7 +342,8 @@ ggplot(data, aes(x=factor(Var), y=Mean, group=Subtype)) +
   geom_line(aes(color = Subtype), size = 5) +
    labs(x="", y="") +
   ggtitle("") +
-  scale_colour_manual(values=colors_line) +
+  #scale_colour_manual(values=colors_line) +
+  scale_colour_manual(values=col1) +
   theme(axis.line = element_line(size=2, colour = "black"),
         panel.grid.major = element_line(colour = "#d3d3d3"), panel.grid.minor = element_blank(),
         panel.border = element_blank(), panel.background = element_blank()) +
@@ -331,12 +351,11 @@ ggplot(data, aes(x=factor(Var), y=Mean, group=Subtype)) +
         axis.text.x=element_text(colour="black", size = 10),
         axis.text.y=element_text(colour="black", size = 10),
         legend.key=element_rect(fill="white", colour="white")) + 
+    theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=1, size= 23, face = "bold")) +
   theme(
     panel.grid.major = element_line(colour = "black", linetype = "dotted", size = 1.5),
     panel.grid.major.x = element_blank(),
     panel.grid.minor.x = element_blank(), 
-    axis.text.x = element_text(face="bold", color="black", 
-                           size=23, angle = 320, vjust=.5),
           axis.text.y = element_text(face="bold", color="black", 
                            size=20),
     axis.ticks.length=unit(0.3,"cm"),
@@ -345,17 +364,18 @@ ggplot(data, aes(x=factor(Var), y=Mean, group=Subtype)) +
   theme(
     legend.title = element_text(size = 30), 
     legend.text = element_text(size = 30)) + 
-  scale_y_continuous(limits = c(50, 70))
+  scale_y_continuous(limits = c(50, 70)) 
 
 ```
 
 # Split 2
-```{r, echo = F}
+```{r, echo = F, fig.height= 10, fig.width=15}
 
-data_2 <- plyr::ldply(split[2], data.frame)[-1]
+data_2 <- plyr::ldply(split[2], data.frame)[-1] 
 
-data_2 = gather(data_2, "Var", "Mean", `AD`:`AB`, factor_key = F) %>%
+data_2 = gather(data_2, "Var", "Mean", `Anxious.Depressed`:`Social.Problems`, factor_key = F) %>%
   rename(Subtype = cluster)
+data_2$Subtype = factor(data_2$Subtype)
 #Turn your 'treatment' column into a character vector
 data_2$Var <- as.character(data_2$Var)
 #Then turn it back into a factor with the levels in the correct order
@@ -365,7 +385,8 @@ ggplot(data_2, aes(x=factor(Var), y=Mean, group=Subtype)) +
   geom_line(aes(color = Subtype), size = 5) +
    labs(x="", y="") +
   ggtitle("") +
-  scale_colour_manual(values=colors_line) +
+  #scale_colour_manual(values=colors_line) +
+  scale_colour_manual(values=col1) +
   theme(axis.line = element_line(size=2, colour = "black"),
         panel.grid.major = element_line(colour = "#d3d3d3"), panel.grid.minor = element_blank(),
         panel.border = element_blank(), panel.background = element_blank()) +
@@ -373,12 +394,11 @@ ggplot(data_2, aes(x=factor(Var), y=Mean, group=Subtype)) +
         axis.text.x=element_text(colour="black", size = 10),
         axis.text.y=element_text(colour="black", size = 10),
         legend.key=element_rect(fill="white", colour="white")) + 
+    theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=1, size= 23, face = "bold")) +
   theme(
     panel.grid.major = element_line(colour = "black", linetype = "dotted", size = 1.5),
     panel.grid.major.x = element_blank(),
     panel.grid.minor.x = element_blank(), 
-    axis.text.x = element_text(face="bold", color="black", 
-                           size=23, angle = 320, vjust=.5),
           axis.text.y = element_text(face="bold", color="black", 
                            size=20),
     axis.ticks.length=unit(0.3,"cm"),
@@ -387,18 +407,17 @@ ggplot(data_2, aes(x=factor(Var), y=Mean, group=Subtype)) +
   theme(
     legend.title = element_text(size = 30), 
     legend.text = element_text(size = 30)) + 
-  scale_y_continuous(limits = c(50, 70))        
+  scale_y_continuous(limits = c(50, 70))       
 
 ```
 
-# Prepare matched cor diagonal
 ```{r, echo = F, include = F}
 
 ggheatmap <- ggplot(reuslts_split, aes(v2, v1, fill = cor))+
   geom_tile(color = "white")+
   scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
                        midpoint = 0, limit = c(-1,1), space = "Lab", 
-                       name="Pearson/nCorrelation") +
+                       name="Pearson Correlation") +
   theme_minimal()+ # minimal theme
   theme(axis.text.x = element_text(angle = 45, vjust = 1, 
                                    size = 12, hjust = 1))+
@@ -408,7 +427,7 @@ ggheatmap <- ggplot(reuslts_split, aes(v2, v1, fill = cor))+
 
 ```
 
-# ***Mean Matched Max Correlations*** 
+## ***Mean Matched Max Correlations*** 
 ```{r, echo = F, fig.width=7, fig.height=10}
 
 ggheatmap + 
@@ -432,20 +451,19 @@ ggheatmap +
   
 ```
 
-# Prepare Correlation Matirx 
 ```{r, warning = F,echo = F, include = F}
 
-col<- colorRampPalette(c("blue","red"))(20)
-#corrplot(US_lowers, method="number", type="lower", col = col)
+col<- colorRampPalette(c("blue","red"))(100)
+
 cor_lowers = data.frame(cormat[1])
 cor_lowers = as.matrix(cor_lowers)
 
 ```
 
-# ***Correlations***
+## ***Correlations***
 ```{r, warning = F,echo = F, fig.width=7, fig.height=10}
 
-#corrplot(US_lowers, method="number", type="lower", col = col)
+
 corrplot(cor_lowers, method="color", col=col,  
          type="lower", order="hclust", 
          addCoef.col = "black", # Add coefficient of correlation
