@@ -40,7 +40,7 @@ setwd("C:/Users/jacob.derosa/Desktop/Scripts/CBCL_Split_Data/Boot_Data")
 
 my_data = lapply(list.files(pattern = glob2rx("*CBCL_Cluster_1*.csv")), read.csv, header = T, sep = ",")
 #Split 1 dataset 
-python_df = read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Full_CBCL_Splits/All_CBCL_Splits/CBCL_Split_1.csv", header = T, sep = ",") %>% rename(Key = X)
+python_df = read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Full_CBCL_Splits/All_CBCL_Splits/CBCL_Split_1.csv", header = T, sep = ",") %>% select(X) %>% rename(Key = X)
 python_list = list(python_df) #put python df into list that will merged with sample split dfs 
 df_list = Map(full_join, my_data, python_list, by = c("Key")) #Combine clustered data with data frame that contains CBCL scores and subject ID 
 
