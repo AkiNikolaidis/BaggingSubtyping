@@ -457,4 +457,3 @@ for i in range(n_straps):
     allcsvs4[i] = pd.DataFrame(df4)
     allcsvs4[i].to_csv('C:/Users/jacob.derosa/Desktop/Scripts/Baggin_Subtyping/CBCL/Boot_Data/CBCL_Split_2_csv_%s.csv' % i)
 
-   
