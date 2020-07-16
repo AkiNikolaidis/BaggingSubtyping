@@ -19,9 +19,7 @@ lapply(packages, library, character.only = TRUE)
 ```{r}
 
 Basic_Demos <- read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Release8/Basic_Demos_r8.csv", header =T, sep = ",")  %>%
-  select(URSI, Age, Sex) %>%
-  rename(Ages = Age)
-
+  select(URSI, Age, Sex) 
 
 Diagnosis <- read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Diagnosis.csv", header = T, sep = ",") %>%
   rename(ANX = `Anxiety.Disorders`) %>%
@@ -39,20 +37,24 @@ Diagnosis <- read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Diagnosis.csv", hea
 CBCL <- read.csv("C:/Users/jacob.derosa/Desktop/Scripts/Release8/CBCL_r8.csv", header =T, sep = ",") %>% select(URSI, ends_with("_T"))
 
 CBCL = CBCL %>% inner_join(Diagnosis) %>% inner_join(Basic_Demos)
-#CBCL$Ages = floor(CBCL$Ages) 
+CBCL$Age = floor(CBCL$Age) 
 
-#write.csv(CBCL, "C:/Users/jacob.derosa/Desktop/Scripts/Full_CBCL_Splits/CBCL.csv")
+# impoart
+write.csv(CBCL, "C:/Users/jacob.derosa/Desktop/Scripts/Full_CBCL_Splits/CBCL.csv")
+
 
 ```
 
 ```{r}
 
-Splitting = CBCL[,13:25] # Select variables to split on 
+set.seed(1433)
 
-set.seed(75845) 
-Splitting_Sample = sample.split(Splitting, SplitRatio = .5) #establish split ratio 
-CBCL_Split_1 = subset(CBCL, Splitting_Sample  == TRUE) #create Split 1
-CBCL_Split_2  = subset(CBCL, Splitting_Sample  == FALSE) #creat Split 2 
+smp_siz = floor(0.50*nrow(CBCL[,13:25])) #columns you want to split
+
+train_ind = sample(seq_len(nrow(CBCL)),size = smp_siz)  # Randomly identifies the rows equal to sample size ( defined in previous instruction) 
+
+CBCL_Split_1 =CBCL[train_ind,] #creates the training dataset with row numbers stored in train_ind
+CBCL_Split_2 =CBCL[-train_ind,] 
 
 # Place both splits into a list 
 List = list(CBCL_Split_1, CBCL_Split_2)
@@ -69,9 +71,10 @@ print(chisq.test(rbind(table(List[[1]]$ADHD_I), table(List[[2]]$ADHD_I))))
 print(chisq.test(rbind(table(List[[1]]$ADHD_H), table(List[[2]]$ADHD_H))))
 print(chisq.test(rbind(table(List[[1]]$ODD), table(List[[2]]$ODD))))
 print(chisq.test(rbind(table(List[[1]]$Other), table(List[[2]]$Other))))
-print(t.test(List[[1]]$Ages, List[[2]]$Ages))
+print(t.test(List[[1]]$Age, List[[2]]$Age))
 
-#write.csv(CBCL_Split_1, "C:/Users/jacob.derosa/Desktop/Scripts/Full_CBCL_Splits/All_CBCL_Splits/CBCL_Split_1.csv")
-#write.csv(CBCL_Split_2, "C:/Users/jacob.derosa/Desktop/Scripts/Full_CBCL_Splits/All_CBCL_Splits/CBCL_Split_2.csv")
+write.csv(CBCL_Split_1, "C:/Users/jacob.derosa/Desktop/Scripts/Baggin_Subtyping/CBCL/Splits/CBCL_Split_1.csv")
+write.csv(CBCL_Split_2, "C:/Users/jacob.derosa/Desktop/Scripts/Baggin_Subtyping/CBCL/Splits/CBCL_Split_2.csv")
 
 ```
+
