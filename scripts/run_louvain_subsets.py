@@ -49,6 +49,6 @@ def run_louvain_one_subset(i):
 
 if __name__ == '__main__':
     pool = multiprocessing.Pool(max_processes)
-    results = pool.map(run_louvain_one_subset, range(n_subsets))
+    results = pool.map_async(run_louvain_one_subset, range(n_subsets))
     pool.close()
     pool.join()
