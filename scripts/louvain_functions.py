@@ -321,7 +321,7 @@ def pheno_clust(filepath=None, subset=None, X=None, plot=True, outfile=None, rep
 
 def run_louvain(data_path, n_straps, split_id, subset_proportion, out_dir):
     """Run louvain subtyping for an input subset with a specified data path.
-    Returns a directory of csv files with subtype labels for each participant (either for boot or no_boot)
+    Returns a directory of .npy files with subtype labels for each participant (either for boot or no_boot)
 
     Keyword arguments:
     data_path -- string specifying path to a .csv file with the raw data
@@ -331,12 +331,6 @@ def run_louvain(data_path, n_straps, split_id, subset_proportion, out_dir):
     out_dir -- name for the output directory
 
     """
-
-    # make directory structure
-    os.system(f'mkdir {out_dir}')
-    os.system(f'mkdir {out_dir}/{subset_proportion}_pct')
-    os.system(f'mkdir {out_dir}/{subset_proportion}_pct/split_{split_id}')
-
     # load input dataframe
     df = pd.read_csv(data_path)
     df = df.rename(columns={'URSI': 'Key'})
@@ -361,9 +355,8 @@ def run_louvain(data_path, n_straps, split_id, subset_proportion, out_dir):
         # put together subids, cluster assignments, and modularity values into dataframe together
         out_df = pd.DataFrame({'subid':y,'cluster':communities, 'Q':Q})
 
-        # save output csv file
-        out_df.to_csv(f'{out_dir}/{subset_proportion}_pct/split_{split_id}/no_boot/louvain_clusters.csv', index = False)
-
+        # save output to .npy file
+        np.save(f'{out_dir}/{subset_proportion}_pct/split_{split_id}/no_boot/louvain_clusters.npy', out_df)
     # bootstrap version
     else:
         # make output sub-directory
@@ -391,14 +384,9 @@ def run_louvain(data_path, n_straps, split_id, subset_proportion, out_dir):
         for i in range(b_idx.shape[0]):
             y_boot[i] = y[b_idx[i]]
 
-        # lists to store boostrapping results
-        #bootstrap_split_subids = []
-        #bootstrap_split_communities = []
-        #bootstrap_split_Q = []
-
         # do the bootstrapping!
         for i in range(n_straps):
-            print(f'Starting bootstrap iteration {i+1}/{n_straps}')
+            print(f'Starting subset {split_id} bootstrap iteration {i+1}/{n_straps}')
 
             # data for a particular bootstrap resample
             X_split = df.iloc[b_idx[i],:]
@@ -417,9 +405,9 @@ def run_louvain(data_path, n_straps, split_id, subset_proportion, out_dir):
             #bootstrap_split_communities.append([communities])
             #bootstrap_split_Q.append([Q])
 
-            # put together dataframe for output to csv based on results for a particular iteration
+            # put together dataframe for output to .npy based on results for a particular iteration
             out_df = pd.DataFrame({'URSI':y_boot[i],
                                    'cluster':communities,
                                    'Q':Q})
-            # save csv file
-            out_df.to_csv(f'{out_dir}/{subset_proportion}_pct/split_{split_id}/boot/louvain_clusters_{i}.csv', index = False)
+            # save .npy file
+            np.save(f'{out_dir}/{subset_proportion}_pct/split_{split_id}/boot/louvain_clusters_{i}.npy', out_df)
