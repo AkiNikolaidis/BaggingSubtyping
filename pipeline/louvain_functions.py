@@ -391,19 +391,12 @@ def run_louvain(data_path, n_straps, split_id, subset_proportion, out_dir):
             # data for a particular bootstrap resample
             X_split = df.iloc[b_idx[i],:]
 
-            # matching subids for the bootstrap resample
-            #bootstrap_split_subids.append([y_boot[i]])
-
             # scale the data within each bootstrap
             X_data =np.array(X_split[subset]).astype(np.float64)
             X_data_scaled = sklearn.preprocessing.scale(X_data)
 
             # run pheno_clust function on scaled data
             communities, Q = pheno_clust(X=X_data_scaled, plot=False, verbose=False)
-
-            # append the resulting communities and Q values to output list
-            #bootstrap_split_communities.append([communities])
-            #bootstrap_split_Q.append([Q])
 
             # put together dataframe for output to .npy based on results for a particular iteration
             out_df = pd.DataFrame({'URSI':y_boot[i],
