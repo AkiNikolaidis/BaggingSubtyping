@@ -1,0 +1,157 @@
+---
+title: "cleaning outcome data"
+author: "Michelle.VanTieghem"
+date: "7/23/2020"
+output: html_document
+---
+
+
+```{r, include = F, echo = F}
+library(tidyverse)
+
+```
+
+# CBCL + clinical outcomes
+
+## load outcome datasets 
+```{r}
+# binary variables for each diagnosis possible
+dx_df <- read.csv("../../data/HBN_Data/Diagnosis.csv")
+head(dx_df)
+
+dx_df <- dx_df %>%
+  mutate(complete_dx = ifelse(rowSums(is.na(.)) > 0, 0, 1))
+
+# for each subject, how many diagnoses they have - broken into primary, secondary, etc. 
+# and then what category and type of diagnosis 
+consensus_df <- read.csv("../../data/HBN_data/ConsensusDX_r8.csv")
+head(consensus_df)
+
+# get rid of the zillions of columns of mostly NAs 
+# just keep primary and secondary DX 
+consensus_df <- consensus_df %>%
+  select(URSI, contains("01"), contains("02")) %>%
+  # mark incomplete evals as NOT complte 
+  mutate(complete_con_dx1 = ifelse(DX_01_Cat == "No Diagnosis Given: Incomplete Eval", 0, 1), 
+         complete_con_dx2 = ifelse(DX_02_Cat == "No Diagnosis Given: Incomplete Eval", 0, 1))
+
+```
+
+## load cluster input, CBCL
+
+```{r}
+cbcl_df <- read.csv("../../data/HBN_data/CBCL_r8.csv")
+head(cbcl_df)
+
+cbcl_df <- cbcl_df %>%
+  mutate(complete_cbcl = ifelse(rowSums(is.na(.)) > 0, 0, 1)) 
+```
+
+## merge together
+```{r}
+clinical_df <- cbcl_df %>%
+  left_join(., dx_df, by = "URSI", all = T) %>%
+  left_join(., consensus_df, by = "URSI", all = T) %>%
+  mutate(complete_dx = ifelse(is.na(complete_dx), 0, complete_dx), 
+         complete_con_dx1 = ifelse(is.na(complete_con_dx1), 0, complete_con_dx1))
+
+```
+
+
+## missingness tables
+cbcl is missing a lot of data
+```{r}
+clinical_df %>%
+  group_by(complete_cbcl) %>%
+  count()
+```
+
+
+diagnosis missingness
+```{r}
+clinical_df %>%
+  group_by(complete_dx) %>% 
+  count()
+```
+
+consensus DX missingness
+
+```{r}
+clinical_df %>%
+  group_by(complete_con_dx1) %>% 
+  count()
+```
+
+## of complete CBCL, how many with DX data?
+```{r}
+clinical_df %>%
+  filter(complete_cbcl == 1) %>%
+  group_by(complete_dx, complete_con_dx1) %>%
+  count()
+```
+
+
+# IQ and cognitive measures
+clustering: WASI + WIAT 
+outcome: WISC + WAIS
+
+## load outcome datasets 
+```{r}
+
+wisc_df <- read.csv("../../data/HBN_data/WISC_r8.csv")
+head(wisc_df)
+
+wais_df <- read.csv("../../data/HBN_data/WAIS_r8.csv")
+head(wais_df)
+```
+
+## load cluster input data 
+```{r}
+# only use WIAT Complete & WIAT Valid 
+wiat_df <- read.csv("../../data/HBN_Data/WIAT_r8.csv")
+head(wiat_df)
+
+wasi_df <- read.csv("../../data/HBN_Data/WASI_r8.csv")
+head(wasi_df)
+```
+
+## merge together
+```{r}
+cog_df <- wiat_df %>%
+  left_join(wasi_df, by = "URSI", all = T) %>%
+  left_join(wais_df, by = "URSI", all = T) %>%
+  left_join(wisc_df, by = "URSI", all = T) %>%
+  mutate(WASI_Complete = replace_na(WASI_Complete, 0), 
+         WIAT_Complete = replace_na(WIAT_Complete , 0),
+         WAIS_Complete = replace_na(WAIS_Complete, 0),
+         WISC_complete = replace_na(WISC_complete, 0))
+
+```
+
+## count missingness
+clustering input: we shouldn't use WASI! very small N 
+```{r}
+cog_df %>%
+  group_by(WASI_Complete, WIAT_Complete) %>%
+  count()
+
+```
+
+outcomes: we shouldn't use WAIS! very small N 
+```{r}
+cog_df %>%
+  group_by(WISC_complete, WAIS_Complete) %>%
+  count()
+
+```
+
+## of complete WIAT, how many complete WISC?
+```{r}
+cog_df %>%
+  filter(WIAT_Complete == 1) %>%
+  group_by(WISC_complete) %>%
+  count()
+
+```
+
+## questions: what do 2s mean for "complete" variables? 
