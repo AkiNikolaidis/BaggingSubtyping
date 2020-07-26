@@ -15,7 +15,7 @@ def bagging_adjacency_matrixes(csv_folder, split, data_frame_path, out_dir):
     
     '''csv_folder: folder that contains all the csv output from python louvain.
        split: string in the csv files' names that specifies the split eg.Split_1 
-       data_frame_path: name of path to orginial dataframe that includes subject ID ans variables used for louvain 
+       data_frame_path: name of path to orginial dataframe that includes subject ID and variables used for louvain 
        out_dir: name of path where final dataframe with subtypes will be saved  
     '''
     
@@ -78,9 +78,3 @@ def bagging_adjacency_matrixes(csv_folder, split, data_frame_path, out_dir):
 #out_dir = 'C:/Users/jacob.derosa/Documents/Split_1.csv'
 #data_frame_path = 'C:/Users/jacob.derosa/Desktop/Scripts/Baggin_Subtyping/CBCL/Splits/CBCL_Split_1.csv' # Change Path 
 #adj_full, mask_full, stab_full, Split, Q = bagging_adjacency_matrixes(csv_folder, split, data_frame_path, out_dir)
-
-
-
-
-
-
