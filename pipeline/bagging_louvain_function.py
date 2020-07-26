@@ -53,7 +53,7 @@ def bagging_adjacency_matrixes(csv_folder, split, data_frame_path, out_dir):
     Q = graph.modularity(Louvain, weights=graph.es['weight']) #compute modularity 
     print(Q)
     # Create dataframe of Subtypes for Split 1 
-    Subtypes = pd.DataFrame(Louvain.membership) #obtain subtyper membership 
+    Subtypes = pd.DataFrame(Louvain.membership) #obtain subtype membership 
     Subtypes = Subtypes + 1
     
     # create dataframe of Split 1 Subtypes 
