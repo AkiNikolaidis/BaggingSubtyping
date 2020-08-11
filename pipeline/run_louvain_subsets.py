@@ -2,6 +2,7 @@ import pandas as pd
 from louvain_functions import *
 import multiprocessing
 import sys
+import scipy
 
 """6 command line arguments:
 
