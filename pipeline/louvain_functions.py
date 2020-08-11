@@ -10,6 +10,9 @@ from sklearn import preprocessing
 from sklearn.model_selection import train_test_split
 from time import time
 import os
+from PyBASC import utils as ut
+from igraph import *
+
 
 def match(C):
     """
@@ -404,3 +407,62 @@ def run_louvain(data_path, n_straps, split_id, subset_proportion, out_dir):
                                    'Q':Q})
             # save .npy file
             np.save(f'{out_dir}/{subset_proportion}_pct/split_{split_id}/boot/louvain_clusters_{i}.npy', out_df)
+
+def bagging_adjacency_matrixes(csv_folder, data_frame_path, out_dir):
+
+    '''csv_folder: folder that contains all the .npy files
+       split: string in the csv files' names that specifies the split eg.Split_1
+       data_frame_path: name of path to orginial dataframe that includes subject ID and variables used for louvain
+       out_dir: name of path where final dataframe with subtypes will be saved
+    '''
+    my_data = [pd.DataFrame(np.load(csv_folder+file, allow_pickle=True)) for file in os.listdir(csv_folder)]
+
+    for i in range(len(my_data)): # loop over my_data
+        my_data[i].drop(columns = [2], inplace = True)
+        my_data[i].rename({0:'Key', 1:'cluster'}, inplace = True, axis = 1)
+        boot=my_data[i].drop_duplicates() #remove duplicates
+        a =  ut.adjacency_matrix(boot.cluster.values[:, np.newaxis]).astype('int') # create adjacency matrix
+        this_adj=pd.DataFrame(a.todense(),columns=boot.Key, index=boot.Key).sort_index().sort_index(axis=1)# add columns and index name to adj
+        np.fill_diagonal(this_adj.values, 0)
+
+        if i ==0:
+            adj_full=this_adj #if this is the first adjacency matrix set it as the initial adj_full
+        else:
+            adj_full=adj_full.add(this_adj,fill_value=0) # add this adjacency matrix to the full adjacency matrix
+
+
+        boot_mask=my_data[i].drop_duplicates()
+        boot_mask.cluster=boot_mask.cluster.replace(boot_mask.cluster.unique(),np.ones(boot_mask.cluster.unique().shape))#replace all clusters with 1
+        m =  ut.adjacency_matrix(boot_mask.cluster.values[:, np.newaxis]).astype('int') # create adjacency matrix
+        mask_adj=pd.DataFrame(m.todense(),columns=boot.Key, index=boot.Key).sort_index().sort_index(axis=1)# add columns and index name to adj
+        np.fill_diagonal(mask_adj.values, 0)
+        if i ==0:
+            mask_full= mask_adj  #if this is the first adjacency matrix set it as the initial mask_full
+        else:
+            mask_full=mask_full.add( mask_adj,fill_value=0) # add this mask adjacency matrix to the full mask adjacency matrix
+
+
+        stab_full = adj_full.div(mask_full)
+        np.fill_diagonal(stab_full.values, 0)
+
+    columnsNamesArr = pd.DataFrame(stab_full.columns.values) #extract the Key (ID) from the stability matrix
+    graph = Graph.Weighted_Adjacency(stab_full.values.tolist(), mode=ADJ_UNDIRECTED, attr="weight") #turn stability matrix into a weighted graph
+    Louvain = graph.community_multilevel(weights=graph.es['weight']) #apply louvain community detection
+    Q = graph.modularity(Louvain, weights=graph.es['weight']) #compute modularity
+    print(Q)
+    # Create dataframe of Subtypes for Split 1
+    Subtypes = pd.DataFrame(Louvain.membership) #obtain subtype membership
+    Subtypes = Subtypes + 1
+
+    # create dataframe of Split 1 Subtypes
+    subs = pd.concat([columnsNamesArr.reset_index(drop=True), Subtypes], axis=1) #concatenate subtype assignments and Key
+    subs.columns = ['Key', 'Subtype']
+
+    df = pd.read_csv(data_frame_path) #read in orginial dataframe that includes subject ID ans variables used for louvain
+    df = df.rename(columns={'URSI': 'Key'})
+
+    Split = pd.merge(subs, df, on='Key') #add subtype assignments to dataframe
+
+    Split.to_csv(out_dir) #save final dataframe to desired directory
+
+    return adj_full, mask_full, stab_full, Split, Q

@@ -20,9 +20,13 @@ split_pct = int(sys.argv[2])
 n_subsets = int(sys.argv[3])
 n_straps = int(sys.argv[4])
 max_processes = int(sys.argv[5])
-mri = bool(sys.argv[6])
+if sys.argv[6] == 'True':
+    mri = True
+else:
+    mri = False
 out_dir = sys.argv[7]
 
+print(mri)
 df = pd.read_csv(data_path)
 
 
