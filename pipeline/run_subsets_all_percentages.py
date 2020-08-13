@@ -2,7 +2,7 @@ from louvain_functions import *
 import os
 
 
-def run_subsets_all_percentages(input_data_path, n_subsets, n_boots, mri, n_cpus, output_dir)
+def run_subsets_all_percentages(input_data_path, n_subsets, n_boots, mri, n_cpus, output_dir):
 	# run boostrapping on each subset for each percentage
 	for pct in [10,20,30,40,50,60,70,80,90]:
 		os.system(f'python run_louvain_subsets.py ../data/split1.csv {pct} {n_subsets} {n_boots} {n_cpus} False {output_dir}')
@@ -16,3 +16,8 @@ def run_subsets_all_percentages(input_data_path, n_subsets, n_boots, mri, n_cpus
 	        bagging_adjacency_matrixes(csv_folder = f'{output_dir}/{j}_pct/split_{i}/boot/',
 	                                   data_frame_path =f'{output_dir}/{j}_pct/split_{i}/split_sample.csv',
 	                                   out_dir = f'{output_dir}/{j}_pct/split_{i}/split_sample_louvain.csv')
+
+
+
+
+run_subsets_all_percentages(input_data_path = '../data/wiat_wisc.csv', n_subsets = 50, n_boots = 50, mri = False, n_cpus = 2, output_dir = 'hbn_cog')
