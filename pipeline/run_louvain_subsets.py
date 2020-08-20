@@ -58,25 +58,20 @@ def run_louvain_one_subset_fmri(i):
     print(f'starting subset {i}')
     # split the data
     split = df.sample(frac=split_pct/100, replace=False, random_state=i)
-
     # taking only the top 5% of features (5% most connected edges)
 
     # take the mean of each feature (dropping the participant identifiers)
     mean = split.drop(columns = 'URSI').mean()
-
     # take the 5% of columns with highest mean
     thr=mean.shape[0]*0.95
     rank=scipy.stats.rankdata(mean,method='min')
     ind = np.argwhere(rank>=thr)
-    top5_col = split.drop(columns = 'URSI').columns[ind]
-    split = split[list(top5_col)]
-
-    # add identifiers back in
+    top5_col = split.drop(columns = 'URSI').columns.values[ind]
+    split=split[top5_col.flatten()]
+    # # add identifiers back in
     split['URSI'] = df['URSI']
-
-    # remove NAs
+    # # remove NAs
     split.dropna(inplace=True)
-
     # make a sub-directory for that split and save the data there
     os.system(f'mkdir {out_dir}/{split_pct}_pct/split_{i}')
     split_data_path = f'{out_dir}/{split_pct}_pct/split_{i}/split_sample.csv'
@@ -86,7 +81,7 @@ def run_louvain_one_subset_fmri(i):
     run_louvain(data_path = split_data_path, n_straps = n_straps, split_id = i, subset_proportion = split_pct, out_dir = out_dir)
 
     # run non-bootstrapped louvain for that split
-    run_louvain(data_path = split_data_path, n_straps = 'none', split_id = i, subset_proportion = split_pct, out_dir = out_dir)    
+    run_louvain(data_path = split_data_path, n_straps = 'none', split_id = i, subset_proportion = split_pct, out_dir = out_dir)  
 
 if mri == True:
     if __name__ == '__main__':
